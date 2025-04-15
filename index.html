@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ChatUp</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    #chat { border: 1px solid #ccc; height: 300px; overflow-y: scroll; margin-bottom: 10px; padding: 10px; }
+    .msg { margin: 5px 0; }
+  </style>
+</head>
+<body>
+
+<h2>ChatUp</h2>
+
+<div id="auth">
+  <input id="name" placeholder="Tên thật">
+  <input id="dob" placeholder="Ngày sinh">
+  <input id="email" placeholder="Email">
+  <input id="password" type="password" placeholder="Mật khẩu">
+  <button onclick="signup()">Đăng ký</button>
+  <button onclick="login()">Đăng nhập</button>
+</div>
+
+<div id="chat-ui" style="display:none">
+  <h3>Xin chào <span id="username"></span></h3>
+  <div id="chat"></div>
+  <input id="message" placeholder="Nhập tin nhắn">
+  <button onclick="sendMessage()">Gửi</button>
+</div>
+
+<script type="module">
+ // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
+  authDomain: "chatup-7fed7.firebaseapp.com",
+  projectId: "chatup-7fed7",
+  storageBucket: "chatup-7fed7.firebasestorage.app",
+  messagingSenderId: "287838782402",
+  appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b",
+  measurementId: "G-2CXCQNLQXP"
+};
+
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  async function signup() {
+    const email = document.getElementById("email").value;
+    const pass = document.getElementById("password").value;
+    const name = document.getElementById("name").value;
+    const dob = document.getElementById("dob").value;
+
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await setDoc(doc(db, "users", cred.user.uid), {
+      name, dob, email
+    });
+    alert("Đăng ký thành công!");
+  }
+
+  async function login() {
+    const email = document.getElementById("email").value;
+    const pass = document.getElementById("password").value;
+    await signInWithEmailAndPassword(auth, email, pass);
+  }
+
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      document.getElementById("auth").style.display = "none";
+      document.getElementById("chat-ui").style.display = "block";
+
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+      document.getElementById("username").innerText = userSnap.data().name;
+
+      const q = query(collection(db, "messages"), orderBy("time"));
+      onSnapshot(q, (snapshot) => {
+        const chat = document.getElementById("chat");
+        chat.innerHTML = "";
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const div = document.createElement("div");
+          div.classList.add("msg");
+          div.innerText = `${data.name}: ${data.text}`;
+          chat.appendChild(div);
+        });
+      });
+    }
+  });
+
+  async function sendMessage() {
+    const msg = document.getElementById("message").value;
+    const user = auth.currentUser;
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+    await addDoc(collection(db, "messages"), {
+      name: userSnap.data().name,
+      text: msg,
+      time: new Date()
+    });
+    document.getElementById("message").value = "";
+  }
+</script>
+</body>
+</html>
