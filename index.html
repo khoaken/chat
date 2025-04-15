@@ -14,18 +14,23 @@
 <h2>ChatUp</h2>
 
 <div id="auth">
-  <input id="name" placeholder="Tên thật">
-  <input id="dob" placeholder="Ngày sinh">
-  <input id="email" placeholder="Email">
-  <input id="password" type="password" placeholder="Mật khẩu">
+  <h2>Đăng ký</h2>
+  <input id="signup-email" placeholder="Email"><br>
+  <input id="signup-pass" type="password" placeholder="Mật khẩu"><br>
+  <input id="signup-name" placeholder="Tên thật"><br>
+  <input id="signup-dob" type="date"><br>
   <button onclick="signup()">Đăng ký</button>
+
+  <h2>Đăng nhập</h2>
+  <input id="login-email" placeholder="Email"><br>
+  <input id="login-pass" type="password" placeholder="Mật khẩu"><br>
   <button onclick="login()">Đăng nhập</button>
 </div>
 
-<div id="chat-ui" style="display:none">
-  <h3>Xin chào <span id="username"></span></h3>
-  <div id="chat"></div>
-  <input id="message" placeholder="Nhập tin nhắn">
+<div id="chat-ui" style="display:none;">
+  <p>Xin chào, <span id="username"></span>!</p>
+  <div id="chat" style="border:1px solid #ccc; padding:10px; height:200px; overflow:auto;"></div>
+  <input id="message" placeholder="Nhập tin nhắn...">
   <button onclick="sendMessage()">Gửi</button>
 </div>
 
