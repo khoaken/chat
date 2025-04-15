@@ -30,44 +30,69 @@
 </div>
 
 <script type="module">
- // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
-  authDomain: "chatup-7fed7.firebaseapp.com",
-  projectId: "chatup-7fed7",
-  storageBucket: "chatup-7fed7.firebasestorage.app",
-  messagingSenderId: "287838782402",
-  appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b",
-  measurementId: "G-2CXCQNLQXP"
-};
-
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, setDoc, doc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+  import {
+    getAuth,
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    onSnapshot,
+    query,
+    orderBy,
+    setDoc,
+    doc,
+    getDoc
+  } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
+    authDomain: "chatup-7fed7.firebaseapp.com",
+    projectId: "chatup-7fed7",
+    storageBucket: "chatup-7fed7.firebasestorage.app",
+    messagingSenderId: "287838782402",
+    appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b",
+    measurementId: "G-2CXCQNLQXP"
+  };
 
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
 
+  // Đăng ký
   async function signup() {
-    const email = document.getElementById("email").value;
-    const pass = document.getElementById("password").value;
-    const name = document.getElementById("name").value;
-    const dob = document.getElementById("dob").value;
+    const email = document.getElementById("signup-email").value;
+    const pass = document.getElementById("signup-pass").value;
+    const name = document.getElementById("signup-name").value;
+    const dob = document.getElementById("signup-dob").value;
 
-    const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    await setDoc(doc(db, "users", cred.user.uid), {
-      name, dob, email
-    });
-    alert("Đăng ký thành công!");
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      await setDoc(doc(db, "users", cred.user.uid), {
+        name, dob, email
+      });
+      alert("Đăng ký thành công!");
+    } catch (err) {
+      alert("Lỗi: " + err.message);
+    }
   }
 
+  // Đăng nhập
   async function login() {
-    const email = document.getElementById("email").value;
-    const pass = document.getElementById("password").value;
-    await signInWithEmailAndPassword(auth, email, pass);
+    const email = document.getElementById("login-email").value;
+    const pass = document.getElementById("login-pass").value;
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (err) {
+      alert("Lỗi: " + err.message);
+    }
   }
 
+  // Check trạng thái đăng nhập
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       document.getElementById("auth").style.display = "none";
@@ -75,7 +100,9 @@ const firebaseConfig = {
 
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
-      document.getElementById("username").innerText = userSnap.data().name;
+      const userName = userSnap.data().name || "Ẩn danh";
+
+      document.getElementById("username").innerText = userName;
 
       const q = query(collection(db, "messages"), orderBy("time"));
       onSnapshot(q, (snapshot) => {
@@ -92,18 +119,30 @@ const firebaseConfig = {
     }
   });
 
+  // Gửi tin nhắn
   async function sendMessage() {
     const msg = document.getElementById("message").value;
     const user = auth.currentUser;
+    if (!user) return;
+
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
+    const userName = userSnap.data().name;
+
     await addDoc(collection(db, "messages"), {
-      name: userSnap.data().name,
+      name: userName,
       text: msg,
       time: new Date()
     });
+
     document.getElementById("message").value = "";
   }
+
+  // Export ra window để dùng trong HTML onclick
+  window.signup = signup;
+  window.login = login;
+  window.sendMessage = sendMessage;
 </script>
+
 </body>
 </html>
