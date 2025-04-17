@@ -1,12 +1,50 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
   <meta charset="UTF-8">
   <title>ChatUp</title>
   <style>
-    body { font-family: Arial; padding: 20px; }
-    #chat { border: 1px solid #ccc; height: 300px; overflow-y: scroll; margin-bottom: 10px; padding: 10px; }
-    .msg { margin: 5px 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      padding: 20px;
+    }
+    #chat {
+      border: 1px solid #ccc;
+      background: white;
+      height: 300px;
+      overflow-y: scroll;
+      margin-bottom: 10px;
+      padding: 10px;
+    }
+    .msg {
+      margin: 5px 0;
+      padding: 5px 10px;
+      border-radius: 10px;
+      max-width: 70%;
+      word-wrap: break-word;
+    }
+    .my-msg {
+      background: #DCF8C6;
+      text-align: right;
+      margin-left: auto;
+    }
+    .other-msg {
+      background: #eee;
+      text-align: left;
+      margin-right: auto;
+    }
+    #auth input, #chat-ui input {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0;
+      box-sizing: border-box;
+    }
+    button {
+      padding: 8px 12px;
+      margin-top: 5px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -14,51 +52,36 @@
 <h2>ChatUp</h2>
 
 <div id="auth">
-  <h2>Đăng ký</h2>
-  <input id="signup-email" placeholder="Email"><br>
-  <input id="signup-pass" type="password" placeholder="Mật khẩu"><br>
-  <input id="signup-name" placeholder="Tên thật"><br>
-  <input id="signup-dob" type="date"><br>
+  <h3>Đăng ký</h3>
+  <input id="signup-email" placeholder="Email">
+  <input id="signup-pass" type="password" placeholder="Mật khẩu">
+  <input id="signup-name" placeholder="Tên thật">
+  <input id="signup-dob" type="date">
   <button onclick="signup()">Đăng ký</button>
 
-  <h2>Đăng nhập</h2>
-  <input id="login-email" placeholder="Email"><br>
-  <input id="login-pass" type="password" placeholder="Mật khẩu"><br>
+  <h3>Đăng nhập</h3>
+  <input id="login-email" placeholder="Email">
+  <input id="login-pass" type="password" placeholder="Mật khẩu">
   <button onclick="login()">Đăng nhập</button>
 </div>
 
 <div id="chat-ui" style="display:none;">
-  <p>Xin chào, <span id="username"></span>!</p>
-  <div id="chat" style="border:1px solid #ccc; padding:10px; height:200px; overflow:auto;"></div>
-  <input id="message" placeholder="Nhập tin nhắn...">
+  <p>Xin chào, <span id="username"></span>! <button onclick="logout()">Đăng xuất</button></p>
+  <div id="chat"></div>
+  <input id="message" placeholder="Nhập tin nhắn..." onkeypress="if(event.key==='Enter') sendMessage()">
   <button onclick="sendMessage()">Gửi</button>
 </div>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-  import {
-    getAuth,
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
-    onAuthStateChanged
-  } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-  import {
-    getFirestore,
-    collection,
-    addDoc,
-    onSnapshot,
-    query,
-    orderBy,
-    setDoc,
-    doc,
-    getDoc
-  } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, setDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
     authDomain: "chatup-7fed7.firebaseapp.com",
     projectId: "chatup-7fed7",
-    storageBucket: "chatup-7fed7.firebasestorage.app",
+    storageBucket: "chatup-7fed7.appspot.com",
     messagingSenderId: "287838782402",
     appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b",
     measurementId: "G-2CXCQNLQXP"
@@ -70,16 +93,27 @@
 
   // Đăng ký
   async function signup() {
-    const email = document.getElementById("signup-email").value;
-    const pass = document.getElementById("signup-pass").value;
-    const name = document.getElementById("signup-name").value;
-    const dob = document.getElementById("signup-dob").value;
+    const email = document.getElementById("signup-email").value.trim();
+    const pass = document.getElementById("signup-pass").value.trim();
+    const name = document.getElementById("signup-name").value.trim();
+    const dob = document.getElementById("signup-dob").value.trim();
+
+    if (!email || !pass || !name || !dob) {
+      alert("Vui lòng điền đầy đủ thông tin.");
+      return;
+    }
+    if (!email.includes("@")) {
+      alert("Email không hợp lệ.");
+      return;
+    }
+    if (pass.length < 6) {
+      alert("Mật khẩu phải từ 6 ký tự trở lên.");
+      return;
+    }
 
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      await setDoc(doc(db, "users", cred.user.uid), {
-        name, dob, email
-      });
+      await setDoc(doc(db, "users", cred.user.uid), { name, dob, email });
       alert("Đăng ký thành công!");
     } catch (err) {
       alert("Lỗi: " + err.message);
@@ -88,8 +122,14 @@
 
   // Đăng nhập
   async function login() {
-    const email = document.getElementById("login-email").value;
-    const pass = document.getElementById("login-pass").value;
+    const email = document.getElementById("login-email").value.trim();
+    const pass = document.getElementById("login-pass").value.trim();
+
+    if (!email || !pass) {
+      alert("Vui lòng nhập email và mật khẩu.");
+      return;
+    }
+
     try {
       await signInWithEmailAndPassword(auth, email, pass);
     } catch (err) {
@@ -97,7 +137,32 @@
     }
   }
 
-  // Check trạng thái đăng nhập
+  // Đăng xuất
+  async function logout() {
+    await signOut(auth);
+    location.reload();
+  }
+
+  // Gửi tin nhắn
+  async function sendMessage() {
+    const msg = document.getElementById("message").value.trim();
+    const user = auth.currentUser;
+    if (!user || !msg) return;
+
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+    const userName = userSnap.data().name;
+
+    await addDoc(collection(db, "messages"), {
+      name: userName,
+      text: msg,
+      time: new Date()
+    });
+
+    document.getElementById("message").value = "";
+  }
+
+  // Theo dõi trạng thái đăng nhập
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       document.getElementById("auth").style.display = "none";
@@ -113,40 +178,28 @@
       onSnapshot(q, (snapshot) => {
         const chat = document.getElementById("chat");
         chat.innerHTML = "";
-        snapshot.forEach(doc => {
-          const data = doc.data();
+
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
           const div = document.createElement("div");
+          const date = data.time?.toDate();
+          const timeStr = date ? date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+
           div.classList.add("msg");
-          div.innerText = `${data.name}: ${data.text}`;
+          div.classList.add(data.name === userName ? "my-msg" : "other-msg");
+          div.innerText = `[${timeStr}] ${data.name}: ${data.text}`;
           chat.appendChild(div);
         });
+
+        chat.scrollTop = chat.scrollHeight;
       });
     }
   });
 
-  // Gửi tin nhắn
-  async function sendMessage() {
-    const msg = document.getElementById("message").value;
-    const user = auth.currentUser;
-    if (!user) return;
-
-    const userRef = doc(db, "users", user.uid);
-    const userSnap = await getDoc(userRef);
-    const userName = userSnap.data().name;
-
-    await addDoc(collection(db, "messages"), {
-      name: userName,
-      text: msg,
-      time: new Date()
-    });
-
-    document.getElementById("message").value = "";
-  }
-
-  // Export ra window để dùng trong HTML onclick
   window.signup = signup;
   window.login = login;
   window.sendMessage = sendMessage;
+  window.logout = logout;
 </script>
 
 </body>
