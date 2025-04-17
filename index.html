@@ -1,16 +1,21 @@
-<!-- TOÀN BỘ FILE HTML, PHIÊN BẢN CÓ THÊM: cập nhật avatar từ thiết bị + xoá tin nhắn -->
 <!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>ChatUp</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Chat" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet" />
   <style>
     body {
       font-family: 'Montserrat', sans-serif;
       background: #f4f4f4;
       padding: 20px;
+    }
+    h2 {
+      margin-top: 0;
     }
     #chat {
       border: 1px solid #ccc;
@@ -21,7 +26,6 @@
       padding: 10px;
     }
     .msg {
-      position: relative;
       margin: 5px 0;
       padding: 5px 10px;
       border-radius: 10px;
@@ -40,16 +44,6 @@
     }
     .msg b {
       display: block;
-    }
-    .delete-btn {
-      position: absolute;
-      top: 2px;
-      right: 5px;
-      font-size: 12px;
-      color: red;
-      background: transparent;
-      border: none;
-      cursor: pointer;
     }
     #auth input, #chat-ui input {
       width: 100%;
@@ -73,11 +67,9 @@
     .tab-content.active {
       display: block;
     }
-    #avatar-preview {
-      display: block;
-      max-width: 100px;
-      margin: 5px 0;
-      border-radius: 50%;
+    #avatar {
+      width: 100%;
+      margin-top: 5px;
     }
   </style>
 </head>
@@ -96,8 +88,7 @@
     <input id="signup-pass" type="password" placeholder="Mật khẩu (>=6)">
     <input id="signup-name" placeholder="Tên hiển thị">
     <input id="signup-dob" type="date">
-    <input type="file" id="signup-avatar-file" accept="image/*">
-    <img id="avatar-preview" src="#" alt="Avatar Preview" style="display:none;">
+    <input id="signup-avatar" placeholder="URL Ảnh đại diện">
     <button onclick="signup()">Đăng ký</button>
   </div>
 
@@ -109,16 +100,7 @@
 </div>
 
 <div id="chat-ui" style="display:none;">
-  <p>
-    Xin chào, <span id="username"></span>!
-    <button onclick="logout()">Đăng xuất</button>
-  </p>
-
-  <div id="update-avatar">
-    <input type="file" id="new-avatar-file" accept="image/*">
-    <button onclick="updateAvatar()">Cập nhật ảnh</button>
-  </div>
-
+  <p>Xin chào, <span id="username"></span>! <button onclick="logout()">Đăng xuất</button></p>
   <div id="chat"></div>
   <input id="message" placeholder="Nhập tin nhắn..." onkeypress="if(event.key==='Enter') sendMessage()">
   <button onclick="sendMessage()">Gửi</button>
@@ -127,8 +109,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
   import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-  import { getFirestore, collection, addDoc, deleteDoc, doc, getDoc, setDoc, onSnapshot, orderBy, query, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
-  import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, setDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
@@ -143,31 +124,10 @@
   const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db = getFirestore(app);
-  const storage = getStorage(app);
-
-  let currentUserData = null;
 
   window.switchTab = function(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
     document.getElementById(tabId).classList.add('active');
-  }
-
-  document.getElementById("signup-avatar-file").addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = e => {
-        document.getElementById("avatar-preview").src = e.target.result;
-        document.getElementById("avatar-preview").style.display = 'block';
-      };
-      reader.readAsDataURL(file);
-    }
-  });
-
-  async function uploadAvatar(file, uid) {
-    const storageRef = ref(storage, `avatars/${uid}`);
-    await uploadBytes(storageRef, file);
-    return await getDownloadURL(storageRef);
   }
 
   async function signup() {
@@ -175,7 +135,7 @@
     const pass = document.getElementById("signup-pass").value.trim();
     const name = document.getElementById("signup-name").value.trim();
     const dob = document.getElementById("signup-dob").value.trim();
-    const file = document.getElementById("signup-avatar-file").files[0];
+    const avatar = document.getElementById("signup-avatar").value.trim();
 
     if (!email || !pass || !name || !dob) return alert("Vui lòng điền đầy đủ thông tin.");
     if (!email.includes("@")) return alert("Email không hợp lệ.");
@@ -183,25 +143,23 @@
 
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      let avatarURL = "";
-      if (file) avatarURL = await uploadAvatar(file, cred.user.uid);
-
-      await setDoc(doc(db, "users", cred.user.uid), { name, dob, email, avatar: avatarURL });
+      await setDoc(doc(db, "users", cred.user.uid), { name, dob, email, avatar });
       alert("Đăng ký thành công!");
     } catch (err) {
-      alert("Lỗi khi đăng ký.");
+      alert("Lỗi: Tài khoản đã tồn tại hoặc dữ liệu không hợp lệ.");
     }
   }
 
   async function login() {
     const email = document.getElementById("login-email").value.trim();
     const pass = document.getElementById("login-pass").value.trim();
+
     if (!email || !pass) return alert("Vui lòng nhập email và mật khẩu.");
 
     try {
       await signInWithEmailAndPassword(auth, email, pass);
-    } catch {
-      alert("Email hoặc mật khẩu sai.");
+    } catch (err) {
+      alert("Lỗi: Email hoặc mật khẩu không đúng.");
     }
   }
 
@@ -215,38 +173,17 @@
     const user = auth.currentUser;
     if (!user || !msg) return;
 
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+    const userData = userSnap.data();
     await addDoc(collection(db, "messages"), {
-      uid: user.uid,
-      name: currentUserData.name,
-      avatar: currentUserData.avatar || "",
+      name: userData.name,
+      avatar: userData.avatar || "",
       text: msg,
       time: new Date()
     });
 
     document.getElementById("message").value = "";
-  }
-
-  async function updateAvatar() {
-    const file = document.getElementById("new-avatar-file").files[0];
-    if (!file) return alert("Vui lòng chọn file ảnh mới.");
-
-    try {
-      const url = await uploadAvatar(file, auth.currentUser.uid);
-      await updateDoc(doc(db, "users", auth.currentUser.uid), { avatar: url });
-      currentUserData.avatar = url;
-      alert("Cập nhật ảnh đại diện thành công!");
-    } catch (e) {
-      alert("Không thể cập nhật ảnh.");
-    }
-  }
-
-  async function deleteMessage(msgId) {
-    if (!confirm("Bạn có chắc muốn xoá tin nhắn này?")) return;
-    try {
-      await deleteDoc(doc(db, "messages", msgId));
-    } catch {
-      alert("Không thể xoá tin nhắn.");
-    }
   }
 
   onAuthStateChanged(auth, async (user) => {
@@ -255,8 +192,8 @@
       document.getElementById("chat-ui").style.display = "block";
 
       const userSnap = await getDoc(doc(db, "users", user.uid));
-      currentUserData = userSnap.data();
-      document.getElementById("username").innerText = currentUserData.name;
+      const userData = userSnap.data();
+      document.getElementById("username").innerText = userData.name;
 
       const q = query(collection(db, "messages"), orderBy("time"));
       onSnapshot(q, (snapshot) => {
@@ -268,19 +205,10 @@
           const div = document.createElement("div");
           const date = data.time?.toDate();
           const timeStr = date ? date.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '';
-          const isMine = data.uid === user.uid;
+          div.classList.add("msg", data.name === userData.name ? "my-msg" : "other-msg");
 
-          div.classList.add("msg", isMine ? "my-msg" : "other-msg");
           const avatar = data.avatar ? `<img src="${data.avatar}" width="24" height="24" style="border-radius:50%; vertical-align:middle;">` : '';
-          div.innerHTML = `${isMine ? '' : avatar} <b>${data.name}</b> <small>${timeStr}</small><br>${data.text}`;
-          if (isMine) {
-            const btn = document.createElement("button");
-            btn.className = "delete-btn";
-            btn.innerText = "x";
-            btn.onclick = () => deleteMessage(docSnap.id);
-            div.appendChild(btn);
-          }
-
+          div.innerHTML = `${avatar} <b>${data.name}</b> <small>${timeStr}</small><br>${data.text}`;
           chat.appendChild(div);
         });
 
@@ -293,7 +221,6 @@
   window.login = login;
   window.sendMessage = sendMessage;
   window.logout = logout;
-  window.updateAvatar = updateAvatar;
 </script>
 
 </body>
