@@ -1,17 +1,21 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>ChatUp</title>
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Chat">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Chat" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet" />
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Montserrat', sans-serif;
       background: #f4f4f4;
       padding: 20px;
+    }
+    h2 {
+      margin-top: 0;
     }
     #chat {
       border: 1px solid #ccc;
@@ -38,6 +42,9 @@
       text-align: left;
       margin-right: auto;
     }
+    .msg b {
+      display: block;
+    }
     #auth input, #chat-ui input {
       width: 100%;
       padding: 8px;
@@ -49,6 +56,21 @@
       margin-top: 5px;
       cursor: pointer;
     }
+    .tab-buttons {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    #avatar {
+      width: 100%;
+      margin-top: 5px;
+    }
   </style>
 </head>
 <body>
@@ -56,17 +78,25 @@
 <h2>ChatUp</h2>
 
 <div id="auth">
-  <h3>Đăng ký</h3>
-  <input id="signup-email" placeholder="Email">
-  <input id="signup-pass" type="password" placeholder="Mật khẩu">
-  <input id="signup-name" placeholder="Tên thật">
-  <input id="signup-dob" type="date">
-  <button onclick="signup()">Đăng ký</button>
+  <div class="tab-buttons">
+    <button onclick="switchTab('signup-tab')">Đăng ký</button>
+    <button onclick="switchTab('login-tab')">Đăng nhập</button>
+  </div>
 
-  <h3>Đăng nhập</h3>
-  <input id="login-email" placeholder="Email">
-  <input id="login-pass" type="password" placeholder="Mật khẩu">
-  <button onclick="login()">Đăng nhập</button>
+  <div id="signup-tab" class="tab-content active">
+    <input id="signup-email" placeholder="Email">
+    <input id="signup-pass" type="password" placeholder="Mật khẩu (>=6)">
+    <input id="signup-name" placeholder="Tên hiển thị">
+    <input id="signup-dob" type="date">
+    <input id="signup-avatar" placeholder="URL Ảnh đại diện">
+    <button onclick="signup()">Đăng ký</button>
+  </div>
+
+  <div id="login-tab" class="tab-content">
+    <input id="login-email" placeholder="Email">
+    <input id="login-pass" type="password" placeholder="Mật khẩu">
+    <button onclick="login()">Đăng nhập</button>
+  </div>
 </div>
 
 <div id="chat-ui" style="display:none;">
@@ -95,59 +125,49 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
 
-  // Đăng ký
+  window.switchTab = function(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
+  }
+
   async function signup() {
     const email = document.getElementById("signup-email").value.trim();
     const pass = document.getElementById("signup-pass").value.trim();
     const name = document.getElementById("signup-name").value.trim();
     const dob = document.getElementById("signup-dob").value.trim();
+    const avatar = document.getElementById("signup-avatar").value.trim();
 
-    if (!email || !pass || !name || !dob) {
-      alert("Vui lòng điền đầy đủ thông tin.");
-      return;
-    }
-    if (!email.includes("@")) {
-      alert("Email không hợp lệ.");
-      return;
-    }
-    if (pass.length < 6) {
-      alert("Mật khẩu phải từ 6 ký tự trở lên.");
-      return;
-    }
+    if (!email || !pass || !name || !dob) return alert("Vui lòng điền đầy đủ thông tin.");
+    if (!email.includes("@")) return alert("Email không hợp lệ.");
+    if (pass.length < 6) return alert("Mật khẩu phải từ 6 ký tự.");
 
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      await setDoc(doc(db, "users", cred.user.uid), { name, dob, email });
+      await setDoc(doc(db, "users", cred.user.uid), { name, dob, email, avatar });
       alert("Đăng ký thành công!");
     } catch (err) {
-      alert("Lỗi: " + err.message);
+      alert("Lỗi: Tài khoản đã tồn tại hoặc dữ liệu không hợp lệ.");
     }
   }
 
-  // Đăng nhập
   async function login() {
     const email = document.getElementById("login-email").value.trim();
     const pass = document.getElementById("login-pass").value.trim();
 
-    if (!email || !pass) {
-      alert("Vui lòng nhập email và mật khẩu.");
-      return;
-    }
+    if (!email || !pass) return alert("Vui lòng nhập email và mật khẩu.");
 
     try {
       await signInWithEmailAndPassword(auth, email, pass);
     } catch (err) {
-      alert("Lỗi: " + err.message);
+      alert("Lỗi: Email hoặc mật khẩu không đúng.");
     }
   }
 
-  // Đăng xuất
   async function logout() {
     await signOut(auth);
     location.reload();
   }
 
-  // Gửi tin nhắn
   async function sendMessage() {
     const msg = document.getElementById("message").value.trim();
     const user = auth.currentUser;
@@ -155,10 +175,10 @@
 
     const userRef = doc(db, "users", user.uid);
     const userSnap = await getDoc(userRef);
-    const userName = userSnap.data().name;
-
+    const userData = userSnap.data();
     await addDoc(collection(db, "messages"), {
-      name: userName,
+      name: userData.name,
+      avatar: userData.avatar || "",
       text: msg,
       time: new Date()
     });
@@ -166,17 +186,14 @@
     document.getElementById("message").value = "";
   }
 
-  // Theo dõi trạng thái đăng nhập
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       document.getElementById("auth").style.display = "none";
       document.getElementById("chat-ui").style.display = "block";
 
-      const userRef = doc(db, "users", user.uid);
-      const userSnap = await getDoc(userRef);
-      const userName = userSnap.data().name || "Ẩn danh";
-
-      document.getElementById("username").innerText = userName;
+      const userSnap = await getDoc(doc(db, "users", user.uid));
+      const userData = userSnap.data();
+      document.getElementById("username").innerText = userData.name;
 
       const q = query(collection(db, "messages"), orderBy("time"));
       onSnapshot(q, (snapshot) => {
@@ -187,15 +204,15 @@
           const data = docSnap.data();
           const div = document.createElement("div");
           const date = data.time?.toDate();
-          const timeStr = date ? date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+          const timeStr = date ? date.toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }) : '';
+          div.classList.add("msg", data.name === userData.name ? "my-msg" : "other-msg");
 
-          div.classList.add("msg");
-          div.classList.add(data.name === userName ? "my-msg" : "other-msg");
-          div.innerText = `[${timeStr}] ${data.name}: ${data.text}`;
+          const avatar = data.avatar ? `<img src="${data.avatar}" width="24" height="24" style="border-radius:50%; vertical-align:middle;">` : '';
+          div.innerHTML = `${avatar} <b>${data.name}</b> <small>${timeStr}</small><br>${data.text}`;
           chat.appendChild(div);
         });
 
-        chat.scrollTop = chat.scrollHeight;
+        chat.scrollTo({ top: chat.scrollHeight, behavior: 'smooth' });
       });
     }
   });
