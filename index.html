@@ -15,6 +15,8 @@
     .tab-content.active { display: block; }
     #search-result div, #friends-list div, #pending-requests div { background: white; margin: 5px 0; padding: 8px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
     img { width: 80px; height: 80px; border-radius: 50%; object-fit: cover; margin-bottom: 10px; }
+    #chat-box { display: none; border: 1px solid #ccc; padding: 10px; margin-top: 20px; background: #fff; border-radius: 10px; }
+    #chat-messages { height: 200px; overflow-y: auto; background: #f0f0f0; padding: 5px; margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -62,12 +64,19 @@
 
   <h3>Chờ xác nhận</h3>
   <div id="pending-requests"></div>
+
+  <div id="chat-box">
+    <h3 id="chat-with">Chat với ...</h3>
+    <div id="chat-messages"></div>
+    <input id="chat-input" placeholder="Nhập tin nhắn...">
+    <button onclick="sendMessage()">Gửi</button>
+  </div>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile as authUpdateProfile } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -174,7 +183,7 @@ async function loadFriendsAndRequests(uid) {
       const userSnap = await getDoc(doc(db, "users", friendId));
       const data = userSnap.data();
       const div = document.createElement('div');
-      div.innerText = data?.name || "Người dùng";
+      div.innerHTML = `${data?.name || "Người dùng"} <button onclick="openChat('${friendId}', '${data?.name}')">Nhắn tin</button>`;
       friendsList.appendChild(div);
     });
   });
@@ -219,6 +228,56 @@ window.updateProfile = async function() {
   await updateDoc(userDoc, updates);
   if (name) document.getElementById('username').innerText = name;
   alert("Cập nhật thành công!");
+}
+
+let currentChatId = null;
+let currentChatPartner = null;
+
+window.openChat = async function(friendId, friendName) {
+  document.getElementById('chat-box').style.display = 'block';
+  document.getElementById('chat-with').innerText = `Chat với ${friendName}`;
+  document.getElementById('chat-messages').innerHTML = '';
+
+  const user = auth.currentUser;
+  const chatId = [user.uid, friendId].sort().join('_');
+  currentChatId = chatId;
+  currentChatPartner = friendId;
+
+  const chatRef = collection(db, "chats", chatId, "messages");
+  const q = query(chatRef);
+
+  onSnapshot(q, (snapshot) => {
+    const messagesDiv = document.getElementById("chat-messages");
+    messagesDiv.innerHTML = '';
+    snapshot.forEach(docSnap => {
+      const msg = docSnap.data();
+      const div = document.createElement("div");
+      div.innerText = `${msg.sender === user.uid ? "Bạn" : friendName}: ${msg.text}`;
+      messagesDiv.appendChild(div);
+    });
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  });
+}
+
+window.sendMessage = async function() {
+  const text = document.getElementById("chat-input").value.trim();
+  if (!text || !currentChatId) return;
+  const user = auth.currentUser;
+  const chatRef = collection(db, "chats", currentChatId, "messages");
+
+  await addDoc(chatRef, {
+    sender: user.uid,
+    text,
+    createdAt: new Date()
+  });
+
+  await setDoc(doc(db, "chats", currentChatId), {
+    participants: [user.uid, currentChatPartner],
+    lastMessage: text,
+    updatedAt: new Date()
+  });
+
+  document.getElementById("chat-input").value = '';
 }
 
 onAuthStateChanged(auth, async (user) => {
