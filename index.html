@@ -74,228 +74,183 @@
 </div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile as authUpdateProfile } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, query, where, onSnapshot } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
-  authDomain: "chatup-7fed7.firebaseapp.com",
-  projectId: "chatup-7fed7",
-  storageBucket: "chatup-7fed7.appspot.com",
-  messagingSenderId: "287838782402",
-  appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
-
-window.switchTab = function(tabId) {
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-  document.getElementById(tabId).classList.add('active');
-}
-
-async function signup() {
-  const email = document.getElementById("signup-email").value.trim();
-  const pass = document.getElementById("signup-pass").value.trim();
-  const name = document.getElementById("signup-name").value.trim();
-  const dob = document.getElementById("signup-dob").value.trim();
-  if (!email || !pass || !name || !dob) return alert("Vui lòng điền đầy đủ.");
-
-  try {
-    const cred = await createUserWithEmailAndPassword(auth, email, pass);
-    await setDoc(doc(db, "users", cred.user.uid), { name, dob, email, avatar: "" });
-    alert("Đăng ký thành công!");
-  } catch (err) {
-    alert("Lỗi: " + err.message);
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile as authUpdateProfile } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+  import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, query, where, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+  import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
+  
+  const firebaseConfig = {
+    apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
+    authDomain: "chatup-7fed7.firebaseapp.com",
+    projectId: "chatup-7fed7",
+    storageBucket: "chatup-7fed7.appspot.com",
+    messagingSenderId: "287838782402",
+    appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
+  };
+  
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+  
+  window.switchTab = function(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.add('active');
   }
-}
-
-async function login() {
-  const email = document.getElementById("login-email").value.trim();
-  const pass = document.getElementById("login-pass").value.trim();
-  if (!email || !pass) return alert("Nhập đầy đủ email và mật khẩu.");
-
-  try {
-    await signInWithEmailAndPassword(auth, email, pass);
-  } catch (err) {
-    alert("Lỗi: " + err.message);
+  
+  async function signup() {
+    const email = document.getElementById("signup-email").value.trim();
+    const pass = document.getElementById("signup-pass").value.trim();
+    const name = document.getElementById("signup-name").value.trim();
+    const dob = document.getElementById("signup-dob").value.trim();
+    if (!email || !pass || !name || !dob) return alert("Vui lòng điền đầy đủ.");
+  
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      await setDoc(doc(db, "users", cred.user.uid), { name, dob, email, avatar: "" });
+      alert("Đăng ký thành công!");
+    } catch (err) {
+      alert("Lỗi: " + err.message);
+    }
   }
-}
-
-async function logout() {
-  await signOut(auth);
-  location.reload();
-}
-
-window.searchUser = async function() {
-  const email = document.getElementById('search-user').value.trim();
-  if (!email) return;
-  const q = query(collection(db, "users"), where("email", "==", email));
-  const snapshot = await getDocs(q);
-  const resultDiv = document.getElementById('search-result');
-  resultDiv.innerHTML = '';
-
-  if (snapshot.empty) {
-    resultDiv.innerText = "Không tìm thấy người dùng.";
-    return;
+  
+  async function login() {
+    const email = document.getElementById("login-email").value.trim();
+    const pass = document.getElementById("login-pass").value.trim();
+    if (!email || !pass) return alert("Nhập đầy đủ email và mật khẩu.");
+  
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (err) {
+      alert("Lỗi: " + err.message);
+    }
   }
-
-  snapshot.forEach(docSnap => {
-    const data = docSnap.data();
-    const uid = docSnap.id;
-    const div = document.createElement('div');
-    div.innerHTML = `<b>${data.name}</b> (${data.email}) <button onclick="sendFriendRequest('${uid}')">Kết bạn</button>`;
-    resultDiv.appendChild(div);
-  });
-}
-
-window.sendFriendRequest = async function(targetUid) {
-  const user = auth.currentUser;
-  if (!user) return;
-  await setDoc(doc(db, "friend_requests", `${user.uid}_${targetUid}`), { from: user.uid, to: targetUid, status: "pending" });
-  alert("Đã gửi lời mời!");
-}
-
-window.acceptFriendRequest = async function(requestId, fromUid) {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  await setDoc(doc(db, "friends", user.uid, "list", fromUid), { since: new Date() });
-  await setDoc(doc(db, "friends", fromUid, "list", user.uid), { since: new Date() });
-
-  await updateDoc(doc(db, "friend_requests", requestId), { status: "accepted" });
-  alert("Đã chấp nhận!");
-}
-
-async function loadFriendsAndRequests(uid) {
-  const friendsList = document.getElementById('friends-list');
-  const pendingList = document.getElementById('pending-requests');
-
-  const friendsRef = collection(db, "friends", uid, "list");
-  onSnapshot(friendsRef, async (snapshot) => {
-    friendsList.innerHTML = '';
-    snapshot.forEach(async (docSnap) => {
-      const friendId = docSnap.id;
-      const userSnap = await getDoc(doc(db, "users", friendId));
-      const data = userSnap.data();
-      const div = document.createElement('div');
-      div.innerHTML = `${data?.name || "Người dùng"} <button onclick="openChat('${friendId}', '${data?.name}')">Nhắn tin</button>`;
-      friendsList.appendChild(div);
-    });
-  });
-
-  const requestsRef = collection(db, "friend_requests");
-  const q2 = query(requestsRef, where("to", "==", uid), where("status", "==", "pending"));
-  onSnapshot(q2, (snapshot) => {
-    pendingList.innerHTML = '';
+  
+  async function logout() {
+    await signOut(auth);
+    location.reload();
+  }
+  
+  window.searchUser = async function() {
+    const email = document.getElementById('search-user').value.trim();
+    if (!email) return;
+    const q = query(collection(db, "users"), where("email", "==", email));
+    const snapshot = await getDocs(q);
+    const resultDiv = document.getElementById('search-result');
+    resultDiv.innerHTML = '';
+  
+    if (snapshot.empty) {
+      resultDiv.innerText = "Không tìm thấy người dùng.";
+      return;
+    }
+  
     snapshot.forEach(docSnap => {
       const data = docSnap.data();
-      const fromUid = data.from;
+      const uid = docSnap.id;
       const div = document.createElement('div');
-      div.innerHTML = `${fromUid} <button onclick="acceptFriendRequest('${docSnap.id}', '${fromUid}')">Chấp nhận</button>`;
-      pendingList.appendChild(div);
+      div.innerHTML = `<b>${data.name}</b> (${data.email}) <button onclick="sendFriendRequest('${uid}')">Kết bạn</button>`;
+      resultDiv.appendChild(div);
     });
-  });
-}
-
-window.updateProfile = async function() {
-  const user = auth.currentUser;
-  if (!user) return;
-  const name = document.getElementById('new-name').value.trim();
-  const avatarFile = document.getElementById('new-avatar').files[0];
-
-  const userDoc = doc(db, "users", user.uid);
-  const updates = {};
-
-  if (name) updates.name = name;
-
-  if (avatarFile) {
-    const storageRef = ref(storage, `avatars/${user.uid}`);
-    await uploadBytes(storageRef, avatarFile);
-    const url = await getDownloadURL(storageRef);
-    updates.avatar = url;
-    document.getElementById('avatar').src = url;
   }
-
-  if (name) {
-    await authUpdateProfile(user, { displayName: name });
+  
+  window.sendFriendRequest = async function(targetUid) {
+    const user = auth.currentUser;
+    if (!user) return;
+    await setDoc(doc(db, "friend_requests", `${user.uid}_${targetUid}`), { from: user.uid, to: targetUid, status: "pending" });
+    alert("Đã gửi lời mời!");
   }
-
-  await updateDoc(userDoc, updates);
-  if (name) document.getElementById('username').innerText = name;
-  alert("Cập nhật thành công!");
-}
-
-let currentChatId = null;
-let currentChatPartner = null;
-
-window.openChat = async function(friendId, friendName) {
-  document.getElementById('chat-box').style.display = 'block';
-  document.getElementById('chat-with').innerText = `Chat với ${friendName}`;
-  document.getElementById('chat-messages').innerHTML = '';
-
-  const user = auth.currentUser;
-  const chatId = [user.uid, friendId].sort().join('_');
-  currentChatId = chatId;
-  currentChatPartner = friendId;
-
-  const chatRef = collection(db, "chats", chatId, "messages");
-  const q = query(chatRef);
-
-  onSnapshot(q, (snapshot) => {
-    const messagesDiv = document.getElementById("chat-messages");
-    messagesDiv.innerHTML = '';
-    snapshot.forEach(docSnap => {
-      const msg = docSnap.data();
-      const div = document.createElement("div");
-      div.innerText = `${msg.sender === user.uid ? "Bạn" : friendName}: ${msg.text}`;
-      messagesDiv.appendChild(div);
+  
+  window.acceptFriendRequest = async function(requestId, fromUid) {
+    const user = auth.currentUser;
+    if (!user) return;
+  
+    await setDoc(doc(db, "friends", user.uid, "list", fromUid), { since: new Date() });
+    await setDoc(doc(db, "friends", fromUid, "list", user.uid), { since: new Date() });
+  
+    await updateDoc(doc(db, "friend_requests", requestId), { status: "accepted" });
+    alert("Đã chấp nhận!");
+  }
+  
+  async function loadFriendsAndRequests(uid) {
+    const friendsList = document.getElementById('friends-list');
+    const pendingList = document.getElementById('pending-requests');
+  
+    const friendsRef = collection(db, "friends", uid, "list");
+    onSnapshot(friendsRef, async (snapshot) => {
+      friendsList.innerHTML = '';
+      snapshot.forEach(async (docSnap) => {
+        const friendId = docSnap.id;
+        const userSnap = await getDoc(doc(db, "users", friendId));
+        const data = userSnap.data();
+        const div = document.createElement('div');
+        div.innerHTML = `${data?.name || "Người dùng"} <button onclick="openChatPage('${friendId}')">Nhắn tin</button>`;
+        friendsList.appendChild(div);
+      });
     });
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  });
-}
-
-window.sendMessage = async function() {
-  const text = document.getElementById("chat-input").value.trim();
-  if (!text || !currentChatId) return;
-  const user = auth.currentUser;
-  const chatRef = collection(db, "chats", currentChatId, "messages");
-
-  await addDoc(chatRef, {
-    sender: user.uid,
-    text,
-    createdAt: new Date()
-  });
-
-  await setDoc(doc(db, "chats", currentChatId), {
-    participants: [user.uid, currentChatPartner],
-    lastMessage: text,
-    updatedAt: new Date()
-  });
-
-  document.getElementById("chat-input").value = '';
-}
-
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    document.getElementById("auth").style.display = "none";
-    document.getElementById("friends-ui").style.display = "block";
-    const userSnap = await getDoc(doc(db, "users", user.uid));
-    const userData = userSnap.data();
-    document.getElementById("username").innerText = userData.name;
-    document.getElementById("avatar").src = userData.avatar || "https://via.placeholder.com/80";
-    loadFriendsAndRequests(user.uid);
+  
+    const requestsRef = collection(db, "friend_requests");
+    const q2 = query(requestsRef, where("to", "==", uid), where("status", "==", "pending"));
+    onSnapshot(q2, (snapshot) => {
+      pendingList.innerHTML = '';
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        const fromUid = data.from;
+        const div = document.createElement('div');
+        div.innerHTML = `${fromUid} <button onclick="acceptFriendRequest('${docSnap.id}', '${fromUid}')">Chấp nhận</button>`;
+        pendingList.appendChild(div);
+      });
+    });
   }
-});
-
-window.signup = signup;
-window.login = login;
-window.logout = logout;
-</script>
+  
+  window.updateProfile = async function() {
+    const user = auth.currentUser;
+    if (!user) return;
+    const name = document.getElementById('new-name').value.trim();
+    const avatarFile = document.getElementById('new-avatar').files[0];
+  
+    const userDoc = doc(db, "users", user.uid);
+    const updates = {};
+  
+    if (name) updates.name = name;
+  
+    if (avatarFile) {
+      const storageRef = ref(storage, `avatars/${user.uid}`);
+      await uploadBytes(storageRef, avatarFile);
+      const url = await getDownloadURL(storageRef);
+      updates.avatar = url;
+      document.getElementById('avatar').src = url;
+    }
+  
+    if (name) {
+      await authUpdateProfile(user, { displayName: name });
+    }
+  
+    await updateDoc(userDoc, updates);
+    if (name) document.getElementById('username').innerText = name;
+    alert("Cập nhật thành công!");
+  }
+  
+  window.openChatPage = function(friendId) {
+    window.location.href = `chat.html?uid=${friendId}`;
+  }
+  
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      document.getElementById("auth").style.display = "none";
+      document.getElementById("friends-ui").style.display = "block";
+      const userSnap = await getDoc(doc(db, "users", user.uid));
+      const userData = userSnap.data();
+      document.getElementById("username").innerText = userData.name;
+      document.getElementById("avatar").src = userData.avatar || "https://via.placeholder.com/80";
+      loadFriendsAndRequests(user.uid);
+    }
+  });
+  
+  window.signup = signup;
+  window.login = login;
+  window.logout = logout;
+  </script>
+  
 
 </body>
 </html>
