@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Chat 1v1 - ChatUp</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Montserrat', sans-serif; margin: 0; padding: 0; background: #f4f4f4; display: flex; flex-direction: column; height: 100vh; }
+    #chat-header { padding: 10px; background: #6200ea; color: white; text-align: center; }
+    #messages { flex: 1; padding: 10px; overflow-y: auto; }
+    .message { padding: 8px; margin: 6px 0; border-radius: 10px; max-width: 60%; }
+    .mine { background: #dcf8c6; align-self: flex-end; }
+    .theirs { background: #fff; align-self: flex-start; }
+    #chat-input { display: flex; padding: 10px; background: white; }
+    #chat-input input { flex: 1; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 6px; }
+    #chat-input button { margin-left: 10px; padding: 10px 20px; background: #6200ea; color: white; border: none; border-radius: 6px; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+<div id="chat-header">Đang trò chuyện với <span id="friend-name">...</span></div>
+<div id="messages"></div>
+
+<div id="chat-input">
+  <input type="text" id="message-text" placeholder="Nhập tin nhắn...">
+  <button onclick="sendMessage()">Gửi</button>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
+  authDomain: "chatup-7fed7.firebaseapp.com",
+  projectId: "chatup-7fed7",
+  storageBucket: "chatup-7fed7.appspot.com",
+  messagingSenderId: "287838782402",
+  appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const params = new URLSearchParams(window.location.search);
+const friendId = params.get('uid');
+
+if (!friendId) {
+  alert("Không tìm thấy người cần nhắn tin.");
+  window.location.href = "index.html";
+}
+
+let currentUser;
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    alert("Bạn cần đăng nhập.");
+    window.location.href = "index.html";
+    return;
+  }
+
+  currentUser = user;
+  const friendSnap = await getDoc(doc(db, "users", friendId));
+  const friendData = friendSnap.data();
+  document.getElementById("friend-name").innerText = friendData?.name || "Người dùng";
+
+  listenToMessages();
+});
+
+function getChatId(uid1, uid2) {
+  return [uid1, uid2].sort().join("_");
+}
+
+function listenToMessages() {
+  const chatId = getChatId(currentUser.uid, friendId);
+  const msgRef = collection(db, "chats", chatId, "messages");
+  const q = query(msgRef, orderBy("timestamp"));
+
+  onSnapshot(q, (snapshot) => {
+    const messagesDiv = document.getElementById("messages");
+    messagesDiv.innerHTML = "";
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      const div = document.createElement("div");
+      div.className = `message ${data.from === currentUser.uid ? 'mine' : 'theirs'}`;
+      div.innerText = data.text;
+      messagesDiv.appendChild(div);
+    });
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  });
+}
+
+window.sendMessage = async function () {
+  const textInput = document.getElementById("message-text");
+  const text = textInput.value.trim();
+  if (!text) return;
+
+  const chatId = getChatId(currentUser.uid, friendId);
+  const msgRef = collection(db, "chats", chatId, "messages");
+
+  await addDoc(msgRef, {
+    from: currentUser.uid,
+    to: friendId,
+    text,
+    timestamp: new Date()
+  });
+
+  textInput.value = "";
+}
+</script>
+
+</body>
+</html>
