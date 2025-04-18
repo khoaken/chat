@@ -1,115 +1,125 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="UTF-8">
-  <title>Chat 1v1 - ChatUp</title>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat&display=swap" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ChatUp</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Chat" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Chat</title>
   <style>
-    body { font-family: 'Montserrat', sans-serif; margin: 0; padding: 0; background: #f4f4f4; display: flex; flex-direction: column; height: 100vh; }
-    #chat-header { padding: 10px; background: #6200ea; color: white; text-align: center; }
-    #messages { flex: 1; padding: 10px; overflow-y: auto; }
-    .message { padding: 8px; margin: 6px 0; border-radius: 10px; max-width: 60%; }
-    .mine { background: #dcf8c6; align-self: flex-end; }
-    .theirs { background: #fff; align-self: flex-start; }
-    #chat-input { display: flex; padding: 10px; background: white; }
-    #chat-input input { flex: 1; padding: 10px; font-size: 1em; border: 1px solid #ccc; border-radius: 6px; }
-    #chat-input button { margin-left: 10px; padding: 10px 20px; background: #6200ea; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    body { font-family: sans-serif; margin: 0; padding: 0; background: #f2f2f2; }
+    #chat-container { display: flex; flex-direction: column; height: 100vh; }
+    #chat-header { padding: 10px; background: #4a90e2; color: white; font-size: 18px; }
+    #chat-messages { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    .message { max-width: 70%; padding: 8px 12px; border-radius: 12px; position: relative; }
+    .mine { background: #d1eaff; align-self: flex-start; border-bottom-left-radius: 0; }
+    .theirs { background: #ffffff; align-self: flex-end; border-bottom-right-radius: 0; }
+    .timestamp { font-size: 10px; color: #888; margin-top: 4px; text-align: right; }
+    #chat-input-area { display: flex; padding: 10px; background: #fff; border-top: 1px solid #ccc; }
+    #chat-input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+    #send-button { margin-left: 10px; padding: 8px 16px; border: none; background: #4a90e2; color: white; border-radius: 6px; cursor: pointer; }
   </style>
 </head>
 <body>
+  <div id="chat-container">
+    <div id="chat-header">Đang chat với ...</div>
+    <div id="chat-messages"></div>
+    <div id="chat-input-area">
+      <input type="text" id="chat-input" placeholder="Nhập tin nhắn...">
+      <button id="send-button">Gửi</button>
+    </div>
+  </div>
 
-<div id="chat-header">Đang trò chuyện với <span id="friend-name">...</span></div>
-<div id="messages"></div>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, setDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-<div id="chat-input">
-  <input type="text" id="message-text" placeholder="Nhập tin nhắn...">
-  <button onclick="sendMessage()">Gửi</button>
-</div>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
+      authDomain: "chatup-7fed7.firebaseapp.com",
+      projectId: "chatup-7fed7",
+      storageBucket: "chatup-7fed7.appspot.com",
+      messagingSenderId: "287838782402",
+      appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
+    };
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
-  authDomain: "chatup-7fed7.firebaseapp.com",
-  projectId: "chatup-7fed7",
-  storageBucket: "chatup-7fed7.appspot.com",
-  messagingSenderId: "287838782402",
-  appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
-};
+    let currentChatId = null;
+    let currentChatPartner = null;
+    let currentUser = null;
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+    function getTimeString(date) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
 
-const params = new URLSearchParams(window.location.search);
-const friendId = params.get('uid');
+    function renderMessage(msg) {
+      const div = document.createElement('div');
+      div.className = `message ${msg.sender === currentUser.uid ? 'mine' : 'theirs'}`;
+      div.innerHTML = `
+        <div>${msg.text}</div>
+        <div class="timestamp">${getTimeString(msg.createdAt.toDate())}</div>
+      `;
+      return div;
+    }
 
-if (!friendId) {
-  alert("Không tìm thấy người cần nhắn tin.");
-  window.location.href = "index.html";
-}
+    function setupChat(friendId, friendName) {
+      document.getElementById("chat-header").innerText = `Đang chat với ${friendName}`;
 
-let currentUser;
+      const chatId = [currentUser.uid, friendId].sort().join('_');
+      currentChatId = chatId;
 
-onAuthStateChanged(auth, async (user) => {
-  if (!user) {
-    alert("Bạn cần đăng nhập.");
-    window.location.href = "index.html";
-    return;
-  }
+      const chatRef = collection(db, "chats", chatId, "messages");
+      const q = query(chatRef, orderBy("createdAt"));
 
-  currentUser = user;
-  const friendSnap = await getDoc(doc(db, "users", friendId));
-  const friendData = friendSnap.data();
-  document.getElementById("friend-name").innerText = friendData?.name || "Người dùng";
+      onSnapshot(q, (snapshot) => {
+        const chatMessages = document.getElementById("chat-messages");
+        chatMessages.innerHTML = '';
+        snapshot.forEach(docSnap => {
+          const msg = docSnap.data();
+          chatMessages.appendChild(renderMessage(msg));
+        });
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      });
+    }
 
-  listenToMessages();
-});
+    document.getElementById("send-button").addEventListener("click", async () => {
+      const input = document.getElementById("chat-input");
+      const text = input.value.trim();
+      if (!text || !currentChatId) return;
+      const chatRef = collection(db, "chats", currentChatId, "messages");
 
-function getChatId(uid1, uid2) {
-  return [uid1, uid2].sort().join("_");
-}
+      await addDoc(chatRef, {
+        sender: currentUser.uid,
+        text,
+        createdAt: new Date()
+      });
 
-function listenToMessages() {
-  const chatId = getChatId(currentUser.uid, friendId);
-  const msgRef = collection(db, "chats", chatId, "messages");
-  const q = query(msgRef, orderBy("timestamp"));
+      await setDoc(doc(db, "chats", currentChatId), {
+        participants: [currentUser.uid, currentChatPartner],
+        lastMessage: text,
+        updatedAt: new Date()
+      });
 
-  onSnapshot(q, (snapshot) => {
-    const messagesDiv = document.getElementById("messages");
-    messagesDiv.innerHTML = "";
-    snapshot.forEach(doc => {
-      const data = doc.data();
-      const div = document.createElement("div");
-      div.className = `message ${data.from === currentUser.uid ? 'mine' : 'theirs'}`;
-      div.innerText = data.text;
-      messagesDiv.appendChild(div);
+      input.value = '';
     });
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-  });
-}
 
-window.sendMessage = async function () {
-  const textInput = document.getElementById("message-text");
-  const text = textInput.value.trim();
-  if (!text) return;
-
-  const chatId = getChatId(currentUser.uid, friendId);
-  const msgRef = collection(db, "chats", chatId, "messages");
-
-  await addDoc(msgRef, {
-    from: currentUser.uid,
-    to: friendId,
-    text,
-    timestamp: new Date()
-  });
-
-  textInput.value = "";
-}
-</script>
-
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+      currentUser = user;
+      const urlParams = new URLSearchParams(window.location.search);
+      const partnerId = urlParams.get("uid");
+      if (!partnerId) return;
+      currentChatPartner = partnerId;
+      const partnerSnap = await getDoc(doc(db, "users", partnerId));
+      const partnerData = partnerSnap.data();
+      setupChat(partnerId, partnerData.name);
+    });
+  </script>
 </body>
 </html>
