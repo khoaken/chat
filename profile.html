@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Hồ sơ - ChatUp</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="ChatUp" />
+  <meta name="theme-color" content="#4a90e2" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Montserrat', sans-serif; }
+    .dark-mode { background: #1a202c; color: #e2e8f0; }
+    .dark-mode .bg-white { background: #2d3748; }
+    .dark-mode .bg-gray-100 { background: #1a202c; }
+    .dark-mode .border-gray-200 { border-color: #4a5568; }
+    .dark-mode input, .dark-mode button, .dark-mode textarea { background: #4a5568; color: #e2e8f0; border-color: #718096; }
+    .friend-item, .status-item { transition: all 0.2s ease; }
+    .friend-item:hover, .status-item:hover { transform: translateY(-2px); }
+    .profile-pic { object-fit: cover; border: 2px solid #4a90e2; }
+    .status-input { resize: none; }
+    .status-item { border: 1px solid #e2e8f0; border-radius: 8px; }
+    .dark-mode .status-item { border-color: #4a5568; }
+    .status-text { font-size: 1.1rem; line-height: 1.5; }
+    .status-time { font-size: 0.85rem; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
+    .modal-content { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; }
+    .dark-mode .modal-content { background: #2d3748; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+  <div class="max-w-4xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-semibold text-blue-600">Hồ sơ</h2>
+      <div class="flex items-center gap-4">
+        <button id="dark-toggle" class="text-xl bg-transparent border-none">🌙</button>
+        <button onclick="window.location.href='index.html'" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Quay lại</button>
+      </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <div class="flex items-center gap-6 mb-4">
+        <img id="profile-pic" src="https://via.placeholder.com/100" alt="Avatar" class="w-24 h-24 rounded-full profile-pic">
+        <div>
+          <h3 id="profile-name" class="text-xl font-semibold"></h3>
+          <input type="file" id="profile-pic-input" accept="image/*" class="hidden">
+          <button id="upload-pic-button" class="mt-2 bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Đổi ảnh</button>
+        </div>
+      </div>
+      <button id="message-button" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 hidden">Nhắn tin</button>
+    </div>
+
+    <div id="post-status-section" class="bg-white p-6 rounded-lg shadow-md mb-6 hidden">
+      <h3 class="text-lg font-semibold mb-4">Đăng trạng thái</h3>
+      <textarea id="status-input" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 status-input" placeholder="Bạn đang nghĩ gì?" rows="3"></textarea>
+      <button id="post-status-button" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Đăng</button>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <h3 class="text-lg font-semibold mb-4">Trạng thái</h3>
+      <div id="status-list"></div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md">
+      <h3 class="text-lg font-semibold mb-4">Danh sách bạn bè</h3>
+      <div id="friends-list"></div>
+    </div>
+
+    <div id="edit-status-modal" class="modal">
+      <div class="modal-content">
+        <h3 class="text-lg font-semibold mb-4">Chỉnh sửa trạng thái</h3>
+        <textarea id="edit-status-input" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 status-input" rows="3"></textarea>
+        <div class="flex gap-2">
+          <button id="save-status-button" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Lưu</button>
+          <button id="cancel-status-button" class="flex-1 bg-gray-600 text-white py-2 rounded-lg hover:bg-gray-700">Hủy</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+import { getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
+  authDomain: "chatup-7fed7.firebaseapp.com",
+  projectId: "chatup-7fed7",
+  storageBucket: "chatup-7fed7.appspot.com",
+  messagingSenderId: "287838782402",
+  appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+let currentUser = null;
+let profileUid = null;
+let currentUserData = null;
+
+function loadProfile(userData, uid, isOwnProfile) {
+  document.getElementById("profile-name").innerText = userData.name || "Người dùng";
+  document.getElementById("profile-name").innerHTML += userData.isVerified ? " ✅" : "";
+  const profilePic = userData.profilePic || "https://via.placeholder.com/100";
+  document.getElementById("profile-pic").src = profilePic;
+  document.getElementById("upload-pic-button").style.display = isOwnProfile ? "block" : "none";
+  document.getElementById("post-status-section").classList.toggle("hidden", !isOwnProfile);
+  if (!isOwnProfile && uid !== currentUser.uid) {
+    const messageButton = document.getElementById("message-button");
+    messageButton.classList.remove("hidden");
+    messageButton.onclick = () => window.location.href = `chat.html?uid=${uid}`;
+  }
+}
+
+function loadFriends(uid) {
+  const friendsList = document.getElementById("friends-list");
+  const friendsRef = collection(db, "friends", uid, "list");
+  onSnapshot(friendsRef, async (snapshot) => {
+    friendsList.innerHTML = "";
+    for (const docSnap of snapshot.docs) {
+      const friendId = docSnap.id;
+      const userSnap = await getDoc(doc(db, "users", friendId));
+      const data = userSnap.data();
+      const div = document.createElement("div");
+      div.className = "friend-item bg-gray-50 p-3 rounded-lg flex justify-between items-center";
+      div.innerHTML = `
+        <span class="font-semibold">${data?.name || "Người dùng"} ${data?.isVerified ? "✅" : ""}</span>
+        <div class="flex gap-2">
+          <button onclick="window.location.href='profile.html?uid=${friendId}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
+          <button onclick="window.location.href='chat.html?uid=${friendId}'" class="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Nhắn tin</button>
+        </div>
+      `;
+      friendsList.appendChild(div);
+    }
+  });
+}
+
+function formatTime(timestamp) {
+  const date = timestamp.toDate();
+  const now = new Date();
+  const diffMs = now - date;
+  const diffMins = Math.round(diffMs / 60000);
+  if (diffMins < 1) return "Vừa xong";
+  if (diffMins < 60) return `${diffMins} phút trước`;
+  const diffHours = Math.round(diffMins / 60);
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  return date.toLocaleString();
+}
+
+function loadStatuses(uid, isOwnProfile) {
+  const statusList = document.getElementById("status-list");
+  const statusesRef = collection(db, "users", uid, "statuses");
+  const q = query(statusesRef, orderBy("createdAt", "desc"));
+  onSnapshot(q, (snapshot) => {
+    statusList.innerHTML = "";
+    snapshot.forEach(docSnap => {
+      const status = docSnap.data();
+      const statusId = docSnap.id;
+      const div = document.createElement("div");
+      div.className = "status-item bg-gray-50 p-4 mb-4 shadow-sm";
+      const timeStr = formatTime(status.createdAt);
+      div.innerHTML = `
+        <div class="flex items-start gap-3">
+          <img src="${currentUserData?.profilePic || 'https://via.placeholder.com/40'}" alt="Avatar" class="w-10 h-10 rounded-full profile-pic">
+          <div class="flex-1">
+            <p class="status-text">${status.text}</p>
+            <p class="status-time text-gray-500 mt-1">${timeStr}${status.updatedAt ? ' (Đã chỉnh sửa)' : ''}</p>
+            ${isOwnProfile ? `
+              <div class="flex gap-2 mt-2">
+                <button onclick="editStatus('${statusId}', '${status.text.replace(/'/g, "\\'")}')" class="text-blue-600 text-sm hover:underline">Sửa</button>
+                <button onclick="deleteStatus('${statusId}')" class="text-red-600 text-sm hover:underline">Xóa</button>
+              </div>
+            ` : ''}
+          </div>
+        </div>
+      `;
+      statusList.appendChild(div);
+    });
+  });
+}
+
+document.getElementById("upload-pic-button").addEventListener("click", () => {
+  document.getElementById("profile-pic-input").click();
+});
+
+document.getElementById("profile-pic-input").addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  if (!file || !currentUser) {
+    alert("Vui lòng chọn file ảnh hoặc đăng nhập lại.");
+    return;
+  }
+
+  try {
+    console.log("Bắt đầu upload ảnh:", { fileName: file.name, fileSize: file.size, fileType: file.type });
+
+    if (!file.type.startsWith("image/")) {
+      alert("Vui lòng chọn file ảnh (jpg, png, ...).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File ảnh quá lớn. Vui lòng chọn file nhỏ hơn 5MB.");
+      return;
+    }
+
+    const fileRef = ref(storage, `profile_pics/${currentUser.uid}/${Date.now()}_${file.name}`);
+    console.log("Đang upload file tới:", fileRef.fullPath);
+    const uploadTask = await uploadBytes(fileRef, file);
+    console.log("Upload thành công:", uploadTask);
+
+    const fileURL = await getDownloadURL(fileRef);
+    console.log("URL ảnh:", fileURL);
+
+    console.log("Cập nhật profilePic trong Firestore cho user:", currentUser.uid);
+    await updateDoc(doc(db, "users", currentUser.uid), { profilePic: fileURL });
+
+    const profilePic = document.getElementById("profile-pic");
+    profilePic.src = `${fileURL}?t=${Date.now()}`;
+    currentUserData.profilePic = fileURL;
+    event.target.value = "";
+    alert("Cập nhật ảnh đại diện thành công!");
+  } catch (error) {
+    console.error("Lỗi khi upload ảnh:", error.code, error.message);
+    alert(`Lỗi: ${error.message}`);
+  }
+});
+
+document.getElementById("post-status-button").addEventListener("click", async () => {
+  const statusText = document.getElementById("status-input").value.trim();
+  if (!statusText || !currentUser) return;
+
+  try {
+    const statusesRef = collection(db, "users", currentUser.uid, "statuses");
+    await addDoc(statusesRef, {
+      text: statusText,
+      createdAt: new Date()
+    });
+    document.getElementById("status-input").value = "";
+    alert("Đăng trạng thái thành công!");
+  } catch (error) {
+    alert(`Lỗi khi đăng trạng thái: ${error.message}`);
+  }
+});
+
+window.editStatus = (statusId, currentText) => {
+  const modal = document.getElementById("edit-status-modal");
+  const input = document.getElementById("edit-status-input");
+  input.value = currentText;
+  modal.style.display = "flex";
+
+  document.getElementById("save-status-button").onclick = async () => {
+    const newText = input.value.trim();
+    if (!newText) {
+      alert("Trạng thái không được để trống!");
+      return;
+    }
+    try {
+      await updateDoc(doc(db, "users", currentUser.uid, "statuses", statusId), {
+        text: newText,
+        updatedAt: new Date()
+      });
+      modal.style.display = "none";
+      alert("Chỉnh sửa trạng thái thành công!");
+    } catch (error) {
+      alert(`Lỗi khi chỉnh sửa trạng thái: ${error.message}`);
+    }
+  };
+
+  document.getElementById("cancel-status-button").onclick = () => {
+    modal.style.display = "none";
+  };
+};
+
+window.deleteStatus = async (statusId) => {
+  if (!confirm("Bạn có chắc muốn xóa trạng thái này?")) return;
+  try {
+    await deleteDoc(doc(db, "users", currentUser.uid, "statuses", statusId));
+    alert("Xóa trạng thái thành công!");
+  } catch (error) {
+    alert(`Lỗi khi xóa trạng thái: ${error.message}`);
+  }
+};
+
+document.getElementById("dark-toggle").addEventListener("click", () => {
+  document.body.classList.toggle("dark-mode");
+  localStorage.setItem("theme", document.body.classList.contains("dark-mode") ? "dark" : "light");
+});
+
+if (localStorage.getItem("theme") === "dark") document.body.classList.add("dark-mode");
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    window.location.href = "index.html";
+    return;
+  }
+  currentUser = user;
+  const urlParams = new URLSearchParams(window.location.search);
+  profileUid = urlParams.get("uid") || user.uid;
+  const isOwnProfile = profileUid === user.uid;
+
+  try {
+    const userSnap = await getDoc(doc(db, "users", profileUid));
+    if (!userSnap.exists()) {
+      alert("Không tìm thấy thông tin người dùng.");
+      window.location.href = "index.html";
+      return;
+    }
+    const userData = userSnap.data();
+    currentUserData = userData;
+    loadProfile(userData, profileUid, isOwnProfile);
+    loadFriends(profileUid);
+    loadStatuses(profileUid, isOwnProfile);
+  } catch (error) {
+    alert(`Lỗi khi tải hồ sơ: ${error.message}`);
+    window.location.href = "index.html";
+  }
+});
+</script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932c0e112efa78d1',t:'MTc0NTA2MjA3MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+</body>
+</html>
