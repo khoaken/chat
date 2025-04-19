@@ -18,6 +18,7 @@
     body { 
       font-family: 'Montserrat', sans-serif; 
       padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      margin: 0;
     }
     .dark-mode { background: #1a202c; color: #e2e8f0; }
     .dark-mode .bg-white { background: #2d3748; }
@@ -159,6 +160,7 @@
       .verified-badge { width: 18px; height: 18px; font-size: 0.8rem; }
       .verified-badge:hover::after { font-size: 0.7rem; top: -25px; }
       .reply-section { margin-left: 20px; }
+      .flex.gap-4 { flex-wrap: wrap; }
     }
   </style>
 </head>
@@ -184,6 +186,9 @@
       <div class="flex gap-4">
         <button id="message-button" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 hidden">Nhắn tin</button>
         <button id="add-friend-button" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 hidden">Kết bạn</button>
+        <button id="remove-friend-button" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 hidden">Hủy kết bạn</button>
+        <button id="block-user-button" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 hidden">Chặn người dùng</button>
+        <button id="unblock-user-button" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 hidden">Bỏ chặn</button>
       </div>
     </div>
 
@@ -218,7 +223,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, arrayUnion, arrayRemove, getDocs } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, arrayUnion, arrayRemove, getDocs, where } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -248,7 +253,7 @@ function showToast(message) {
   setTimeout(() => toast.remove(), 3000);
 }
 
-function loadProfile(userData, uid, isOwnProfile, isFriend) {
+async function loadProfile(userData, uid, isOwnProfile) {
   const profileName = document.getElementById("profile-name");
   profileName.innerText = userData.name || "Người dùng";
   if (userData.isVerified) {
@@ -258,23 +263,147 @@ function loadProfile(userData, uid, isOwnProfile, isFriend) {
   profilePic.innerText = userData.name ? userData.name.charAt(0).toUpperCase() : "U";
   document.getElementById("post-status-section").classList.toggle("hidden", !isOwnProfile);
   document.getElementById("upload-pic-button").classList.toggle("hidden", !isOwnProfile);
+
   if (!isOwnProfile && uid !== currentUser.uid) {
     const messageButton = document.getElementById("message-button");
-    messageButton.classList.remove("hidden");
+    const addFriendButton = document.getElementById("add-friend-button");
+    const removeFriendButton = document.getElementById("remove-friend-button");
+    const blockUserButton = document.getElementById("block-user-button");
+    const unblockUserButton = document.getElementById("unblock-user-button");
+
+    // Kiểm tra trạng thái bạn bè
+    const friendDoc = await getDoc(doc(db, "friends", currentUser.uid, "list", uid));
+    const isFriend = friendDoc.exists();
+
+    // Kiểm tra trạng thái chặn
+    const blockDoc = await getDoc(doc(db, "blocked_users", currentUser.uid, "list", uid));
+    const isBlocked = blockDoc.exists();
+
+    // Cập nhật hiển thị các nút
+    messageButton.classList.toggle("hidden", isBlocked);
+    addFriendButton.classList.toggle("hidden", isFriend || isBlocked);
+    removeFriendButton.classList.toggle("hidden", !isFriend || isBlocked);
+    blockUserButton.classList.toggle("hidden", isOwnProfile || isBlocked);
+    unblockUserButton.classList.toggle("hidden", isOwnProfile || !isBlocked);
+
+    // Xử lý nút Nhắn tin
     messageButton.onclick = () => window.location.href = `chat.html?uid=${uid}`;
-    if (!isFriend) {
-      const addFriendButton = document.getElementById("add-friend-button");
-      addFriendButton.classList.remove("hidden");
-      addFriendButton.onclick = async () => {
+
+    // Xử lý nút Chặn người dùng
+    blockUserButton.onclick = async () => {
+      if (!confirm("Bạn có chắc muốn chặn người dùng này?")) return;
+      try {
+        await blockUser(uid, isFriend);
+        showToast("Đã chặn người dùng!");
+      } catch (error) {
+        showToast(`Lỗi khi chặn người dùng: ${error.message}`);
+      }
+    };
+
+    // Xử lý nút Bỏ chặn
+    unblockUserButton.onclick = async () => {
+      if (!confirm("Bạn có chắc muốn bỏ chặn người dùng này?")) return;
+      try {
+        await unblockUser(uid);
+        showToast("Đã bỏ chặn người dùng!");
+      } catch (error) {
+        showToast(`Lỗi khi bỏ chặn: ${error.message}`);
+      }
+    };
+
+    // Xử lý lời mời kết bạn
+    const requestsRef = collection(db, "friend_requests", uid, "requests");
+      const q = query(requestsRef, where("senderUid", "==", currentUser.uid));
+      onSnapshot(q, (snapshot) => {
+        const hasPendingRequest = !snapshot.empty;
+        // Ẩn nút Kết bạn nếu là bạn bè, đã gửi lời mời, hoặc bị chặn
+        addFriendButton.classList.toggle("hidden", isFriend || hasPendingRequest || isBlocked);
+        removeFriendButton.classList.toggle("hidden", !isFriend || isBlocked);
+
+        if (hasPendingRequest && snapshot.docs.length > 0) {
+          addFriendButton.innerText = "Đã gửi lời mời";
+          addFriendButton.classList.remove("bg-green-600", "hover:bg-green-700");
+          addFriendButton.classList.add("bg-gray-600", "cursor-not-allowed");
+          addFriendButton.disabled = true;
+          const requestDoc = snapshot.docs[0];
+          addFriendButton.onclick = async () => {
+            if (!confirm("Bạn có muốn thu hồi lời mời kết bạn?")) return;
+            try {
+              await deleteDoc(doc(db, "friend_requests", uid, "requests", requestDoc.id));
+              addFriendButton.innerText = "Kết bạn";
+              addFriendButton.classList.remove("bg-gray-600", "cursor-not-allowed");
+              addFriendButton.classList.add("bg-green-600", "hover:bg-green-700");
+              addFriendButton.disabled = false;
+              showToast("Đã thu hồi lời mời kết bạn!");
+            } catch (error) {
+              showToast(`Lỗi khi thu hồi lời mời: ${error.message}`);
+            }
+          };
+        } else {
+          addFriendButton.innerText = "Kết bạn";
+          addFriendButton.classList.remove("bg-gray-600", "cursor-not-allowed");
+          addFriendButton.classList.add("bg-green-600", "hover:bg-green-700");
+          addFriendButton.disabled = false;
+          addFriendButton.onclick = async () => {
+            try {
+              await addDoc(collection(db, "friend_requests", uid, "requests"), {
+                senderUid: currentUser.uid,
+                senderName: currentUserData.name || "Người dùng",
+                createdAt: new Date()
+              });
+              showToast("Đã gửi lời mời kết bạn!");
+            } catch (error) {
+              showToast(`Lỗi khi gửi lời mời: ${error.message}`);
+            }
+          };
+        }
+      }, (error) => {
+        showToast(`Lỗi khi kiểm tra lời mời: ${error.message}`);
+      });
+
+    // Xử lý nút Hủy kết bạn
+    if (isFriend) {
+      removeFriendButton.onclick = async () => {
+        if (!confirm("Bạn có chắc muốn hủy kết bạn?")) return;
         try {
-          await setDoc(doc(db, "friends", currentUser.uid, "list", uid), { added: true });
-          addFriendButton.classList.add("hidden");
-          showToast("Thêm bạn thành công!");
+          await deleteDoc(doc(db, "friends", currentUser.uid, "list", uid));
+          await deleteDoc(doc(db, "friends", uid, "list", currentUser.uid));
+          showToast("Đã hủy kết bạn!");
         } catch (error) {
-          showToast(`Lỗi khi thêm bạn: ${error.message}`);
+          showToast(`Lỗi khi hủy kết bạn: ${error.message}`);
         }
       };
     }
+  }
+}
+
+async function blockUser(blockedUid, isFriend) {
+  if (!currentUser) {
+    throw new Error("Vui lòng đăng nhập để chặn người dùng!");
+  }
+  try {
+    // Thêm người dùng vào danh sách chặn
+    await setDoc(doc(db, "blocked_users", currentUser.uid, "list", blockedUid), {
+      blockedAt: new Date()
+    });
+    // Nếu là bạn bè, xóa mối quan hệ bạn bè
+    if (isFriend) {
+      await deleteDoc(doc(db, "friends", currentUser.uid, "list", blockedUid));
+      await deleteDoc(doc(db, "friends", blockedUid, "list", currentUser.uid));
+    }
+  } catch (error) {
+    throw new Error(`Lỗi khi chặn người dùng: ${error.message}`);
+  }
+}
+
+async function unblockUser(blockedUid) {
+  if (!currentUser) {
+    throw new Error("Vui lòng đăng nhập để bỏ chặn người dùng!");
+  }
+  try {
+    await deleteDoc(doc(db, "blocked_users", currentUser.uid, "list", blockedUid));
+  } catch (error) {
+    throw new Error(`Lỗi khi bỏ chặn: ${error.message}`);
   }
 }
 
@@ -283,16 +412,20 @@ function loadFriends(uid) {
   const friendsRef = collection(db, "friends", uid, "list");
   onSnapshot(friendsRef, async (snapshot) => {
     friendsList.innerHTML = "";
+    if (snapshot.empty) {
+      friendsList.innerHTML = `<p class="text-gray-500 text-center">Chưa có bạn bè nào.</p>`;
+      return;
+    }
     for (const docSnap of snapshot.docs) {
       const friendId = docSnap.id;
       const userSnap = await getDoc(doc(db, "users", friendId));
-      const data = userSnap.data();
+      const data = userSnap.data() || {};
       const div = document.createElement("div");
       div.className = "friend-item bg-gray-50 p-3 rounded-lg flex justify-between items-center";
       div.innerHTML = `
         <div class="flex items-center gap-3">
-          <div class="avatar-initial">${data?.name ? data.name.charAt(0).toUpperCase() : "U"}</div>
-          <span class="font-semibold">${data?.name || "Người dùng"}${data?.isVerified ? '<span class="verified-badge">✔</span>' : ""}</span>
+          <div class="avatar-initial">${data.name ? data.name.charAt(0).toUpperCase() : "U"}</div>
+          <span class="font-semibold">${data.name || "Người dùng"}${data.isVerified ? '<span class="verified-badge">✔</span>' : ""}</span>
         </div>
         <div class="flex gap-2">
           <button onclick="window.location.href='profile.html?uid=${friendId}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
@@ -301,6 +434,8 @@ function loadFriends(uid) {
       `;
       friendsList.appendChild(div);
     }
+  }, (error) => {
+    showToast(`Lỗi khi tải danh sách bạn bè: ${error.message}`);
   });
 }
 
@@ -322,7 +457,6 @@ function loadStatuses(uid, isOwnProfile) {
   const statusesRef = collection(db, "users", uid, "statuses");
   const q = query(statusesRef, orderBy("createdAt", "desc"));
   onSnapshot(q, async (snapshot) => {
-    console.log(`[Debug] Status snapshot for uid ${uid}:`, snapshot.docs.length, "documents found");
     if (snapshot.empty) {
       statusList.innerHTML = `<p class="text-gray-500 text-center">Chưa có trạng thái nào.</p>`;
       return;
@@ -333,7 +467,6 @@ function loadStatuses(uid, isOwnProfile) {
     for (const docSnap of snapshot.docs) {
       const status = docSnap.data();
       const statusId = docSnap.id;
-      console.log(`[Debug] Status ${statusId}:`, status);
       const timeStr = formatTime(status.createdAt);
       const likesCount = status.likes?.length || 0;
       const isLiked = status.likes?.includes(currentUser?.uid) || false;
@@ -347,7 +480,7 @@ function loadStatuses(uid, isOwnProfile) {
           <div class="avatar-initial">${profileUserData.name ? profileUserData.name.charAt(0).toUpperCase() : "U"}</div>
           <div class="flex-1">
             <div class="flex items-center gap-2">
-              <span class="font-semibold">${profileUserData.name || "Người dùng"}${profileUserData.isVerified ? '<span class="verified-badge">✔</span>' : ""}</span>
+              <a href="profile.html?uid=${uid}" class="font-semibold hover:underline">${profileUserData.name || "Người dùng"}${profileUserData.isVerified ? '<span class="verified-badge">✔</span>' : ""}</a>
             </div>
             <p class="status-text mt-1">${status.text}</p>
             <p class="status-time text-gray-500 mt-1">${timeStr}${status.updatedAt ? ' (Đã chỉnh sửa)' : ''}</p>
@@ -377,7 +510,6 @@ function loadStatuses(uid, isOwnProfile) {
       loadComments(uid, statusId);
     }
   }, (error) => {
-    console.error(`[Error] Failed to load statuses:`, error);
     showToast(`Lỗi khi tải trạng thái: ${error.message}`);
     statusList.innerHTML = `<p class="text-red-500 text-center">Lỗi khi tải trạng thái. Vui lòng thử lại sau.</p>`;
   });
@@ -388,12 +520,10 @@ function loadComments(uid, statusId) {
   const commentsRef = collection(db, "users", uid, "statuses", statusId, "comments");
   const q = query(commentsRef, orderBy("createdAt", "asc"));
   onSnapshot(q, async (snapshot) => {
-    console.log("[Debug] Comments snapshot for status:", statusId, snapshot.docs.length, "comments");
     commentList.innerHTML = "";
     for (const docSnap of snapshot.docs) {
       const comment = docSnap.data();
       const commentId = docSnap.id;
-      console.log("[Debug] Comment:", commentId, comment);
       const likesCount = comment.likes?.length || 0;
       const isLiked = comment.likes?.includes(currentUser?.uid) || false;
       const div = document.createElement("div");
@@ -402,7 +532,7 @@ function loadComments(uid, statusId) {
         <div class="avatar-initial" style="width: 32px; height: 32px; font-size: 1rem;">${comment.name ? comment.name.charAt(0).toUpperCase() : "U"}</div>
         <div class="flex-1">
           <div class="flex items-center gap-2">
-            <span class="font-semibold text-sm">${comment.name || "Người dùng"}${comment.isVerified ? '<span class="verified-badge" style="width: 16px; height: 16px; font-size: 0.7rem;">✔</span>' : ""}</span>
+            <a href="profile.html?uid=${comment.userId}" class="font-semibold text-sm hover:underline">${comment.name || "Người dùng"}${comment.isVerified ? '<span class="verified-badge" style="width: 16px; height: 16px; font-size: 0.7rem;">✔</span>' : ""}</a>
             ${isOwnProfile ? `<button onclick="deleteComment('${uid}', '${statusId}', '${commentId}')" class="text-red-600 text-xs hover:underline ml-2">Xóa</button>` : ""}
           </div>
           <p class="text-sm">${comment.text}</p>
@@ -426,7 +556,6 @@ function loadComments(uid, statusId) {
       loadReplies(uid, statusId, commentId);
     }
   }, (error) => {
-    console.error("[Error] Failed to load comments:", error);
     showToast(`Lỗi khi tải bình luận: ${error.message}`);
   });
 }
@@ -436,12 +565,10 @@ function loadReplies(uid, statusId, commentId) {
   const repliesRef = collection(db, "users", uid, "statuses", statusId, "comments", commentId, "replies");
   const q = query(repliesRef, orderBy("createdAt", "asc"));
   onSnapshot(q, (snapshot) => {
-    console.log("[Debug] Replies snapshot for comment:", commentId, snapshot.docs.length, "replies");
     replyList.innerHTML = "";
     snapshot.forEach(docSnap => {
       const reply = docSnap.data();
       const replyId = docSnap.id;
-      console.log("[Debug] Reply:", replyId, reply);
       const likesCount = reply.likes?.length || 0;
       const isLiked = reply.likes?.includes(currentUser?.uid) || false;
       const div = document.createElement("div");
@@ -450,7 +577,7 @@ function loadReplies(uid, statusId, commentId) {
         <div class="avatar-initial" style="width: 28px; height: 28px; font-size: 0.9rem;">${reply.name ? reply.name.charAt(0).toUpperCase() : "U"}</div>
         <div class="flex-1">
           <div class="flex items-center gap-2">
-            <span class="font-semibold text-sm">${reply.name || "Người dùng"}${reply.isVerified ? '<span class="verified-badge" style="width: 16px; height: 16px; font-size: 0.7rem;">✔</span>' : ""}</span>
+            <a href="profile.html?uid=${reply.userId}" class="font-semibold text-sm hover:underline">${reply.name || "Người dùng"}${reply.isVerified ? '<span class="verified-badge" style="width: 16px; height: 16px; font-size: 0.7rem;">✔</span>' : ""}</a>
             ${isOwnProfile ? `<button onclick="deleteReply('${uid}', '${statusId}', '${commentId}', '${replyId}')" class="text-red-600 text-xs hover:underline ml-2">Xóa</button>` : ""}
           </div>
           <p class="text-sm">${reply.text}</p>
@@ -465,7 +592,6 @@ function loadReplies(uid, statusId, commentId) {
       replyList.appendChild(div);
     });
   }, (error) => {
-    console.error("[Error] Failed to load replies:", error);
     showToast(`Lỗi khi tải trả lời: ${error.message}`);
   });
 }
@@ -540,59 +666,40 @@ window.toggleReplyLike = async (uid, statusId, commentId, replyId, isLiked) => {
 };
 
 window.toggleCommentSection = (sectionId) => {
-  console.log("[Debug] Toggling comment section:", sectionId);
   const section = document.getElementById(sectionId);
-  if (!section) {
-    console.error("[Error] Comment section not found:", sectionId);
-    return;
+  if (section) {
+    section.style.display = section.style.display === "block" ? "none" : "block";
   }
-  section.style.display = section.style.display === "block" ? "none" : "block";
 };
 
 window.showReplyInput = (inputId) => {
-  console.log("[Debug] Showing reply input:", inputId);
   const inputSection = document.getElementById(inputId);
-  if (!inputSection) {
-    console.error("[Error] Reply input not found:", inputId);
-    return;
+  if (inputSection) {
+    inputSection.classList.toggle("hidden");
   }
-  inputSection.classList.toggle("hidden");
 };
 
 window.postComment = async (statusId, uid, parentCommentId) => {
-  console.log("[Debug] postComment called with:", { statusId, uid, parentCommentId });
   if (!currentUser) {
-    console.log("[Debug] No currentUser, showing login toast");
     showToast("Vui lòng đăng nhập để bình luận!");
     return;
   }
-  if (!statusId || (parentCommentId && !parentCommentId)) {
-    console.error("[Error] Invalid statusId or parentCommentId:", { statusId, parentCommentId });
-    showToast("Lỗi: ID trạng thái hoặc bình luận không hợp lệ!");
-    return;
-  }
   const inputId = parentCommentId ? `reply-input-${parentCommentId}` : `comment-input-${statusId}`;
-  console.log("[Debug] Looking for textarea with ID:", inputId);
   const commentInput = parentCommentId
     ? document.querySelector(`#${inputId} textarea`)
     : document.getElementById(inputId);
   if (!commentInput) {
-    console.error("[Error] Textarea not found for ID:", inputId);
     showToast("Lỗi giao diện: Không tìm thấy ô nhập bình luận!");
     return;
   }
   const commentText = commentInput.value.trim();
-  console.log("[Debug] Comment text:", commentText);
   if (!commentText) {
-    console.log("[Debug] Empty comment text");
     showToast("Bình luận không được để trống!");
     return;
   }
   try {
-    console.log("[Debug] Fetching current user data for UID:", currentUser.uid);
     const currentUserSnap = await getDoc(doc(db, "users", currentUser.uid));
     const currentUserDataLocal = currentUserSnap.data() || {};
-    console.log("[Debug] Current user data:", currentUserDataLocal);
     const commentData = {
       userId: currentUser.uid,
       name: currentUserDataLocal.name || "Người dùng",
@@ -601,112 +708,25 @@ window.postComment = async (statusId, uid, parentCommentId) => {
       createdAt: new Date(),
       likes: []
     };
-    console.log("[Debug] Comment data to be saved:", commentData);
     if (parentCommentId) {
       const repliesRef = collection(db, "users", uid, "statuses", statusId, "comments", parentCommentId, "replies");
-      console.log("[Debug] Adding reply to:", repliesRef.path);
       await addDoc(repliesRef, commentData);
       showToast("Đã đăng trả lời!");
     } else {
       const commentsRef = collection(db, "users", uid, "statuses", statusId, "comments");
-      console.log("[Debug] Adding comment to:", commentsRef.path);
       await addDoc(commentsRef, commentData);
       showToast("Đã đăng bình luận!");
     }
     commentInput.value = "";
-    if (parentCommentId) {
-      console.log("[Debug] Hiding reply input:", `reply-input-${parentCommentId}`);
-      document.getElementById(`reply-input-${parentCommentId}`).classList.add("hidden");
-    }
   } catch (error) {
-    console.error("[Error] Failed to post comment:", error.code, error.message);
     showToast(`Lỗi khi đăng bình luận: ${error.message}`);
   }
 };
 
-window.deleteComment = async (uid, statusId, commentId) => {
-  if (!currentUser || profileUid !== currentUser.uid) {
-    showToast("Bạn không có quyền xóa bình luận này!");
-    return;
-  }
-  if (!confirm("Bạn có chắc muốn xóa bình luận này?")) return;
-  try {
-    await deleteDoc(doc(db, "users", uid, "statuses", statusId, "comments", commentId));
-    showToast("Xóa bình luận thành công!");
-  } catch (error) {
-    showToast(`Lỗi khi xóa bình luận: ${error.message}`);
-  }
-};
-
-window.deleteReply = async (uid, statusId, commentId, replyId) => {
-  if (!currentUser || profileUid !== currentUser.uid) {
-    showToast("Bạn không có quyền xóa trả lời này!");
-    return;
-  }
-  if (!confirm("Bạn có chắc muốn xóa trả lời này?")) return;
-  try {
-    await deleteDoc(doc(db, "users", uid, "statuses", statusId, "comments", commentId, "replies", replyId));
-    showToast("Xóa trả lời thành công!");
-  } catch (error) {
-    showToast(`Lỗi khi xóa trả lời: ${error.message}`);
-  }
-};
-
-document.getElementById("upload-pic-button").addEventListener("click", () => {
-  document.getElementById("profile-pic-input").click();
-});
-
-document.getElementById("profile-pic-input").addEventListener("change", async (event) => {
-  const file = event.target.files[0];
-  if (!file || !currentUser) {
-    showToast("Vui lòng chọn file ảnh hoặc đăng nhập lại.");
-    return;
-  }
-  try {
-    if (!file.type.startsWith("image/")) {
-      showToast("Vui lòng chọn file ảnh (jpg, png, ...).");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      showToast("File ảnh quá lớn. Vui lòng chọn file nhỏ hơn 5MB.");
-      return;
-    }
-    const fileRef = ref(storage, `profile_pics/${currentUser.uid}/${Date.now()}_${file.name}`);
-    await uploadBytes(fileRef, file);
-    const fileURL = await getDownloadURL(fileRef);
-    await updateDoc(doc(db, "users", currentUser.uid), { profilePic: fileURL });
-    currentUserData.profilePic = fileURL;
-    event.target.value = "";
-    showToast("Cập nhật ảnh đại diện thành công!");
-  } catch (error) {
-    showToast(`Lỗi khi upload ảnh: ${error.message}`);
-  }
-});
-
-document.getElementById("post-status-button").addEventListener("click", async () => {
-  const statusText = document.getElementById("status-input").value.trim();
-  if (!statusText || !currentUser) {
-    showToast("Trạng thái không được để trống!");
-    return;
-  }
-  try {
-    const statusesRef = collection(db, "users", currentUser.uid, "statuses");
-    await addDoc(statusesRef, {
-      text: statusText,
-      createdAt: new Date(),
-      likes: []
-    });
-    document.getElementById("status-input").value = "";
-    showToast("Đăng trạng thái thành công!");
-  } catch (error) {
-    showToast(`Lỗi khi đăng trạng thái: ${error.message}`);
-  }
-});
-
-window.editStatus = (statusId, currentText) => {
+window.editStatus = (statusId, text) => {
   const modal = document.getElementById("edit-status-modal");
   const input = document.getElementById("edit-status-input");
-  input.value = currentText;
+  input.value = text;
   modal.style.display = "flex";
   document.getElementById("save-status-button").onclick = async () => {
     const newText = input.value.trim();
@@ -715,14 +735,14 @@ window.editStatus = (statusId, currentText) => {
       return;
     }
     try {
-      await updateDoc(doc(db, "users", currentUser.uid, "statuses", statusId), {
+      await updateDoc(doc(db, "users", profileUid, "statuses", statusId), {
         text: newText,
         updatedAt: new Date()
       });
+      showToast("Đã cập nhật trạng thái!");
       modal.style.display = "none";
-      showToast("Chỉnh sửa trạng thái thành công!");
     } catch (error) {
-      showToast(`Lỗi khi chỉnh sửa trạng thái: ${error.message}`);
+      showToast(`Lỗi khi cập nhật trạng thái: ${error.message}`);
     }
   };
   document.getElementById("cancel-status-button").onclick = () => {
@@ -733,56 +753,107 @@ window.editStatus = (statusId, currentText) => {
 window.deleteStatus = async (statusId) => {
   if (!confirm("Bạn có chắc muốn xóa trạng thái này?")) return;
   try {
-    await deleteDoc(doc(db, "users", currentUser.uid, "statuses", statusId));
-    showToast("Xóa trạng thái thành công!");
+    await deleteDoc(doc(db, "users", profileUid, "statuses", statusId));
+    showToast("Đã xóa trạng thái!");
   } catch (error) {
     showToast(`Lỗi khi xóa trạng thái: ${error.message}`);
   }
 };
 
-document.getElementById("dark-toggle").addEventListener("click", () => {
-  document.body.classList.toggle("dark-mode");
-  localStorage.setItem("theme", document.body.classList.contains("dark-mode") ? "dark" : "light");
-});
+window.deleteComment = async (uid, statusId, commentId) => {
+  if (!confirm("Bạn có chắc muốn xóa bình luận này?")) return;
+  try {
+    await deleteDoc(doc(db, "users", uid, "statuses", statusId, "comments", commentId));
+    showToast("Đã xóa bình luận!");
+  } catch (error) {
+    showToast(`Lỗi khi xóa bình luận: ${error.message}`);
+  }
+};
 
-if (localStorage.getItem("theme") === "dark") document.body.classList.add("dark-mode");
+window.deleteReply = async (uid, statusId, commentId, replyId) => {
+  if (!confirm("Bạn có chắc muốn xóa trả lời này?")) return;
+  try {
+    await deleteDoc(doc(db, "users", uid, "statuses", statusId, "comments", commentId, "replies", replyId));
+    showToast("Đã xóa trả lời!");
+  } catch (error) {
+    showToast(`Lỗi khi xóa trả lời: ${error.message}`);
+  }
+};
 
-onAuthStateChanged(auth, async (user) => {
-  console.log("[Debug] Auth state changed:", user ? user.uid : "No user");
-  if (!user) {
-    console.log("[Debug] Redirecting to index.html due to no user");
-    window.location.href = "index.html";
+// Xử lý đăng trạng thái
+document.getElementById("post-status-button")?.addEventListener("click", async () => {
+  const statusInput = document.getElementById("status-input");
+  const statusText = statusInput.value.trim();
+  if (!statusText) {
+    showToast("Trạng thái không được để trống!");
     return;
   }
-  currentUser = user;
-  const urlParams = new URLSearchParams(window.location.search);
-  profileUid = urlParams.get("uid") || user.uid;
-  isOwnProfile = profileUid === user.uid;
   try {
-    const userSnap = await getDoc(doc(db, "users", profileUid));
-    if (!userSnap.exists()) {
-      showToast("Không tìm thấy thông tin người dùng.");
-      window.location.href = "index.html";
-      return;
-    }
-    const userData = userSnap.data();
-    currentUserData = userData;
-    // Kiểm tra xem profileUid có phải là bạn bè không
-    let isFriend = false;
-    if (!isOwnProfile) {
-      const friendDoc = await getDoc(doc(db, "friends", user.uid, "list", profileUid));
-      isFriend = friendDoc.exists();
-    }
-    loadProfile(userData, profileUid, isOwnProfile, isFriend);
-    loadFriends(profileUid);
-    loadStatuses(profileUid, isOwnProfile);
+    await addDoc(collection(db, "users", currentUser.uid, "statuses"), {
+      text: statusText,
+      createdAt: new Date(),
+      likes: []
+    });
+    showToast("Đã đăng trạng thái!");
+    statusInput.value = "";
   } catch (error) {
-    console.error(`[Error] Failed to load profile:`, error);
-    showToast(`Lỗi khi tải hồ sơ: ${error.message}`);
-    window.location.href = "index.html";
+    showToast(`Lỗi khi đăng trạng thái: ${error.message}`);
+  }
+});
+
+// Xử lý upload ảnh đại diện
+document.getElementById("upload-pic-button")?.addEventListener("click", () => {
+  document.getElementById("profile-pic-input").click();
+});
+
+document.getElementById("profile-pic-input")?.addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) {
+    showToast("Ảnh không được lớn hơn 5MB!");
+    return;
+  }
+  try {
+    const storageRef = ref(storage, `profile_pics/${currentUser.uid}`);
+    await uploadBytes(storageRef, file);
+    const photoURL = await getDownloadURL(storageRef);
+    await updateDoc(doc(db, "users", currentUser.uid), { photoURL });
+    showToast("Đã cập nhật ảnh đại diện!");
+  } catch (error) {
+    showToast(`Lỗi khi tải ảnh lên: ${error.message}`);
+  }
+});
+
+// Xử lý chế độ tối
+document.getElementById("dark-toggle")?.addEventListener("click", () => {
+  document.body.classList.toggle("dark-mode");
+  const isDark = document.body.classList.contains("dark-mode");
+  localStorage.setItem("darkMode", isDark);
+  document.getElementById("dark-toggle").innerText = isDark ? "☀️" : "🌙";
+});
+
+// Khôi phục chế độ tối
+if (localStorage.getItem("darkMode") === "true") {
+  document.body.classList.add("dark-mode");
+  document.getElementById("dark-toggle").innerText = "☀️";
+}
+
+// Khởi tạo trang
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    currentUser = user;
+    currentUserData = (await getDoc(doc(db, "users", user.uid))).data() || {};
+    profileUid = new URLSearchParams(window.location.search).get("uid") || user.uid;
+    isOwnProfile = profileUid === user.uid;
+    const userDoc = await getDoc(doc(db, "users", profileUid));
+    const userData = userDoc.data() || {};
+    await loadProfile(userData, profileUid, isOwnProfile);
+    loadStatuses(profileUid, isOwnProfile);
+    loadFriends(profileUid);
+  } else {
+    window.location.href = "login.html";
   }
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932e645a3d67b06f',t:'MTc0NTA4NjU3NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
