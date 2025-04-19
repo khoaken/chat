@@ -128,8 +128,8 @@
     let message = `Kết quả: <span class="dice">${diceFaces[dice1]}</span><span class="dice">${diceFaces[dice2]}</span><span class="dice">${diceFaces[dice3]}</span> (Tổng: ${total} - ${taiXiuOutcome === "tai" ? "Tài" : "Xỉu"}, ${chanLeOutcome === "chan" ? "Chẵn" : "Lẻ"}). `;
 
     if (selectedBet === taiXiuOutcome || selectedBet === chanLeOutcome) {
-      newBalance += amount * 2; // Win: double the bet
-      message += `Bạn thắng! Nhận được ${amount * 2} xu.`;
+      newBalance += amount ; // Win: the bet
+      message += `Bạn thắng! Nhận được ${amount } xu.`;
     } else {
       newBalance -= amount; // Lose: deduct the bet
       message += `Bạn thua! Mất ${amount} xu.`;
