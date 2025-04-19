@@ -521,6 +521,7 @@
           showToast("Không tìm thấy thông tin bạn bè.");
         }
       } catch (error) {
+        console.error("Error loading friend info:", error);
         showToast(`Lỗi khi tải thông tin bạn bè: ${error.message}`);
       }
     }
@@ -559,6 +560,7 @@
           pinnedMessageDiv.classList.add("hidden");
         }
       } catch (error) {
+        console.error("Error loading pinned message:", error);
         showToast(`Lỗi khi tải tin nhắn ghim: ${error.message}`);
       }
     }
@@ -625,6 +627,7 @@
           lastMessageDate = null;
           lastSenderId = null;
 
+          // Tìm tin nhắn cuối cùng được gửi bởi userId
           const lastSentMessage = messages
             .filter(msg => msg.senderId === userId)
             .slice(-1)[0];
@@ -648,6 +651,7 @@
               content += `<img src="${msg.imageUrl}" alt="Attached image">`;
             }
             content += `<div class="message-time">${formatTime(msg.timestamp)}</div>`;
+            // Chỉ hiển thị "Đã đọc" cho tin nhắn cuối cùng được gửi bởi userId
             if (msg.senderId === userId && msg.id === lastSentMessage?.id && msg.readBy?.includes(friendId)) {
               content += `<div class="read-receipt">Đã đọc ✅</div>`;
             }
@@ -705,9 +709,11 @@
           messagesDiv.scrollTop = messagesDiv.scrollHeight;
           loadPinnedMessage(chatId, userId);
         }, (error) => {
+          console.error("Error loading messages:", error);
           showToast(`Lỗi khi tải tin nhắn: ${error.message}`);
         });
       } catch (error) {
+        console.error("Error initializing messages:", error);
         showToast(`Lỗi khi tải tin nhắn: ${error.message}`);
       }
     }
@@ -725,6 +731,7 @@
           }
         });
       } catch (error) {
+        console.error("Error setting up typing indicator:", error);
         showToast(`Lỗi khi thiết lập chỉ báo gõ: ${error.message}`);
       }
     }
@@ -740,6 +747,14 @@
       const chatId = getChatId(userId, friendId);
 
       try {
+        // Tạo hoặc cập nhật tài liệu chat
+        const chatRef = doc(db, "chats", chatId);
+        await setDoc(chatRef, {
+          participants: [userId, friendId],
+          lastUpdated: serverTimestamp()
+        }, { merge: true });
+
+        // Thêm tin nhắn
         const messageData = {
           senderId: userId,
           text: text,
@@ -748,7 +763,9 @@
         };
         await addDoc(collection(db, "chats", chatId, "messages"), messageData);
         messageInput.value = "";
+        console.log(`Message sent to chat ${chatId}`);
       } catch (error) {
+        console.error("Error sending message:", error);
         showToast(`Lỗi khi gửi tin nhắn: ${error.message}`);
       }
     });
@@ -763,6 +780,14 @@
       const chatId = getChatId(userId, friendId);
 
       try {
+        // Tạo hoặc cập nhật tài liệu chat
+        const chatRef = doc(db, "chats", chatId);
+        await setDoc(chatRef, {
+          participants: [userId, friendId],
+          lastUpdated: serverTimestamp()
+        }, { merge: true });
+
+        // Tải hình ảnh và thêm tin nhắn
         const storageRef = ref(storage, `chat_images/${chatId}/${Date.now()}_${file.name}`);
         await uploadBytes(storageRef, file);
         const imageUrl = await getDownloadURL(storageRef);
@@ -775,7 +800,9 @@
         };
         await addDoc(collection(db, "chats", chatId, "messages"), messageData);
         e.target.value = "";
+        console.log(`Image sent to chat ${chatId}`);
       } catch (error) {
+        console.error("Error uploading image:", error);
         showToast(`Lỗi khi tải ảnh lên: ${error.message}`);
       }
     });
@@ -802,6 +829,7 @@
           await setDoc(typingRef, { isTyping: false });
         }, 3000);
       } catch (error) {
+        console.error("Error updating typing status:", error);
         showToast(`Lỗi khi cập nhật trạng thái gõ: ${error.message}`);
       }
     });
@@ -819,7 +847,7 @@
     });
 
     document.getElementById("back-button").addEventListener("click", () => {
-      window.location.href = "index.html";
+      window.location.href = "hopthu.html";
     });
 
     onAuthStateChanged(auth, async (user) => {
@@ -831,7 +859,7 @@
       const friendId = urlParams.get("uid");
       if (!friendId) {
         showToast("Không tìm thấy người nhận.");
-        window.location.href = "index.html";
+        window.location.href = "hopthu.html";
         return;
       }
       try {
@@ -839,10 +867,12 @@
         await loadMessages(user.uid, friendId);
         setupTypingIndicator(user.uid, friendId);
       } catch (error) {
+        console.error("Error initializing chat:", error);
         showToast(`Lỗi khi khởi tạo chat: ${error.message}`);
-        window.location.href = "index.html";
+        window.location.href = "hopthu.html";
       }
     });
   </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932e6459ea8512e3',t:'MTc0NTA4NjU3NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
