@@ -15,7 +15,10 @@
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
   <style>
-    body { font-family: 'Montserrat', sans-serif; }
+    body { 
+      font-family: 'Montserrat', sans-serif; 
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    }
     .dark-mode { background: #1a202c; color: #e2e8f0; }
     .dark-mode .bg-white { background: #2d3748; }
     .dark-mode .bg-gray-100 { background: #1a202c; }
@@ -102,15 +105,35 @@
       display: flex;
       gap: 10px;
       margin-bottom: 10px;
+      align-items: flex-start;
+    }
+    .comment-item button {
+      transition: all 0.2s ease;
+    }
+    .comment-item button:hover {
+      transform: translateY(-1px);
     }
     .comment-input {
       resize: none;
       font-size: 0.9rem;
     }
+    .reply-section {
+      margin-left: 40px;
+      margin-top: 10px;
+      padding-left: 10px;
+      border-left: 2px solid #e2e8f0;
+    }
+    .dark-mode .reply-section {
+      border-left: 2px solid #4a5568;
+    }
+    .comment-like-button.liked {
+      color: #e53e3e;
+      font-weight: bold;
+    }
     .toast {
       position: fixed;
-      bottom: 20px;
-      right: 20px;
+      bottom: calc(20px + env(safe-area-inset-bottom));
+      right: calc(20px + env(safe-area-inset-right));
       background: #4a90e2;
       color: white;
       padding: 10px 20px;
@@ -128,6 +151,7 @@
       .avatar-initial { width: 36px; height: 36px; font-size: 1rem; }
       .verified-badge { width: 18px; height: 18px; font-size: 0.8rem; }
       .verified-badge:hover::after { font-size: 0.7rem; top: -25px; }
+      .reply-section { margin-left: 20px; }
     }
   </style>
 </head>
@@ -184,7 +208,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, arrayUnion, arrayRemove, getDocs } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -204,6 +228,7 @@ const storage = getStorage(app);
 let currentUser = null;
 let profileUid = null;
 let currentUserData = null;
+let isOwnProfile = false;
 
 function showToast(message) {
   const toast = document.createElement("div");
@@ -256,7 +281,8 @@ function loadFriends(uid) {
 }
 
 function formatTime(timestamp) {
-  const date = timestamp.toDate();
+  if (!timestamp) return "Vừa xong";
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
   const now = new Date();
   const diffMs = now - date;
   const diffMins = Math.round(diffMs / 60000);
@@ -264,29 +290,40 @@ function formatTime(timestamp) {
   if (diffMins < 60) return `${diffMins} phút trước`;
   const diffHours = Math.round(diffMins / 60);
   if (diffHours < 24) return `${diffHours} giờ trước`;
-  return date.toLocaleString();
+  return date.toLocaleString('vi-VN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 function loadStatuses(uid, isOwnProfile) {
   const statusList = document.getElementById("status-list");
   const statusesRef = collection(db, "users", uid, "statuses");
   const q = query(statusesRef, orderBy("createdAt", "desc"));
-  onSnapshot(q, (snapshot) => {
+  onSnapshot(q, async (snapshot) => {
+    console.log(`[Debug] Status snapshot for uid ${uid}:`, snapshot.docs.length, "documents found");
+    if (snapshot.empty) {
+      statusList.innerHTML = `<p class="text-gray-500 text-center">Chưa có trạng thái nào.</p>`;
+      return;
+    }
     statusList.innerHTML = "";
-    snapshot.forEach(docSnap => {
+    const profileUserSnap = await getDoc(doc(db, "users", uid));
+    const profileUserData = profileUserSnap.data() || {};
+    for (const docSnap of snapshot.docs) {
       const status = docSnap.data();
       const statusId = docSnap.id;
+      console.log(`[Debug] Status ${statusId}:`, status);
       const timeStr = formatTime(status.createdAt);
       const likesCount = status.likes?.length || 0;
       const isLiked = status.likes?.includes(currentUser?.uid) || false;
+      const commentsRef = collection(db, "users", uid, "statuses", statusId, "comments");
+      const commentsSnapshot = await getDocs(commentsRef);
+      const commentCount = commentsSnapshot.size;
       const div = document.createElement("div");
       div.className = "status-item bg-gray-50 p-4 mb-4 shadow-sm";
       div.innerHTML = `
         <div class="flex items-start gap-3">
-          <div class="avatar-initial">${currentUserData?.name ? currentUserData.name.charAt(0).toUpperCase() : "U"}</div>
+          <div class="avatar-initial">${profileUserData.name ? profileUserData.name.charAt(0).toUpperCase() : "U"}</div>
           <div class="flex-1">
             <div class="flex items-center gap-2">
-              <span class="font-semibold">${currentUserData?.name || "Người dùng"}${currentUserData?.isVerified ? '<span class="verified-badge">✔</span>' : ""}</span>
+              <span class="font-semibold">${profileUserData.name || "Người dùng"}${profileUserData.isVerified ? '<span class="verified-badge">✔</span>' : ""}</span>
             </div>
             <p class="status-text mt-1">${status.text}</p>
             <p class="status-time text-gray-500 mt-1">${timeStr}${status.updatedAt ? ' (Đã chỉnh sửa)' : ''}</p>
@@ -295,7 +332,7 @@ function loadStatuses(uid, isOwnProfile) {
                 ❤️ Thích (${likesCount})
               </button>
               <button class="comment-button text-sm text-gray-600 hover:text-blue-600" onclick="toggleCommentSection('comment-section-${statusId}')">
-                💬 Bình luận
+                💬 Bình luận (${commentCount})
               </button>
               ${isOwnProfile ? `
                 <div class="flex gap-2">
@@ -307,14 +344,18 @@ function loadStatuses(uid, isOwnProfile) {
             <div id="comment-section-${statusId}" class="comment-section">
               <div id="comment-list-${statusId}" class="mt-2"></div>
               <textarea id="comment-input-${statusId}" class="w-full p-2 mt-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 comment-input" placeholder="Viết bình luận..." rows="2"></textarea>
-              <button class="mt-2 bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700" onclick="postComment('${statusId}', '${uid}')">Gửi</button>
+              <button class="mt-2 bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700" onclick="postComment('${statusId}', '${uid}', null)">Gửi</button>
             </div>
           </div>
         </div>
       `;
       statusList.appendChild(div);
       loadComments(uid, statusId);
-    });
+    }
+  }, (error) => {
+    console.error(`[Error] Failed to load statuses:`, error);
+    showToast(`Lỗi khi tải trạng thái: ${error.message}`);
+    statusList.innerHTML = `<p class="text-red-500 text-center">Lỗi khi tải trạng thái. Vui lòng thử lại sau.</p>`;
   });
 }
 
@@ -322,23 +363,75 @@ function loadComments(uid, statusId) {
   const commentList = document.getElementById(`comment-list-${statusId}`);
   const commentsRef = collection(db, "users", uid, "statuses", statusId, "comments");
   const q = query(commentsRef, orderBy("createdAt", "asc"));
-  onSnapshot(q, (snapshot) => {
+  onSnapshot(q, async (snapshot) => {
     commentList.innerHTML = "";
-    snapshot.forEach(docSnap => {
+    for (const docSnap of snapshot.docs) {
       const comment = docSnap.data();
+      const commentId = docSnap.id;
+      const likesCount = comment.likes?.length || 0;
+      const isLiked = comment.likes?.includes(currentUser?.uid) || false;
       const div = document.createElement("div");
       div.className = "comment-item";
       div.innerHTML = `
         <div class="avatar-initial" style="width: 32px; height: 32px; font-size: 1rem;">${comment.name ? comment.name.charAt(0).toUpperCase() : "U"}</div>
-        <div>
+        <div class="flex-1">
           <div class="flex items-center gap-2">
             <span class="font-semibold text-sm">${comment.name || "Người dùng"}${comment.isVerified ? '<span class="verified-badge" style="width: 16px; height: 16px; font-size: 0.7rem;">✔</span>' : ""}</span>
+            ${isOwnProfile ? `<button onclick="deleteComment('${uid}', '${statusId}', '${commentId}')" class="text-red-600 text-xs hover:underline ml-2">Xóa</button>` : ""}
           </div>
           <p class="text-sm">${comment.text}</p>
           <p class="text-xs text-gray-500">${formatTime(comment.createdAt)}</p>
+          <div class="flex gap-2 mt-1">
+            <button class="comment-like-button text-xs text-gray-600 hover:text-red-600 ${isLiked ? 'liked' : ''}" onclick="toggleCommentLike('${uid}', '${statusId}', '${commentId}', ${isLiked})">
+              ❤️ Thích (${likesCount})
+            </button>
+            <button class="text-xs text-gray-600 hover:text-blue-600" onclick="showReplyInput('reply-input-${commentId}')">
+              💬 Trả lời
+            </button>
+          </div>
+          <div id="reply-input-${commentId}" class="reply-section hidden mt-2">
+            <textarea class="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 comment-input" placeholder="Viết trả lời..." rows="2"></textarea>
+            <button class="mt-2 bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700" onclick="postComment('${statusId}', '${uid}', '${commentId}')">Gửi</button>
+          </div>
+          <div id="reply-list-${commentId}" class="reply-section"></div>
         </div>
       `;
       commentList.appendChild(div);
+      loadReplies(uid, statusId, commentId);
+    }
+  });
+}
+
+function loadReplies(uid, statusId, commentId) {
+  const replyList = document.getElementById(`reply-list-${commentId}`);
+  const repliesRef = collection(db, "users", uid, "statuses", statusId, "comments", commentId, "replies");
+  const q = query(repliesRef, orderBy("createdAt", "asc"));
+  onSnapshot(q, (snapshot) => {
+    replyList.innerHTML = "";
+    snapshot.forEach(docSnap => {
+      const reply = docSnap.data();
+      const replyId = docSnap.id;
+      const likesCount = reply.likes?.length || 0;
+      const isLiked = reply.likes?.includes(currentUser?.uid) || false;
+      const div = document.createElement("div");
+      div.className = "comment-item mt-2";
+      div.innerHTML = `
+        <div class="avatar-initial" style="width: 28px; height: 28px; font-size: 0.9rem;">${reply.name ? reply.name.charAt(0).toUpperCase() : "U"}</div>
+        <div class="flex-1">
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-sm">${reply.name || "Người dùng"}${reply.isVerified ? '<span class="verified-badge" style="width: 16px; height: 16px; font-size: 0.7rem;">✔</span>' : ""}</span>
+            ${isOwnProfile ? `<button onclick="deleteReply('${uid}', '${statusId}', '${commentId}', '${replyId}')" class="text-red-600 text-xs hover:underline ml-2">Xóa</button>` : ""}
+          </div>
+          <p class="text-sm">${reply.text}</p>
+          <p class="text-xs text-gray-500">${formatTime(reply.createdAt)}</p>
+          <div class="flex gap-2 mt-1">
+            <button class="comment-like-button text-xs text-gray-600 hover:text-red-600 ${isLiked ? 'liked' : ''}" onclick="toggleReplyLike('${uid}', '${statusId}', '${commentId}', '${replyId}', ${isLiked})">
+              ❤️ Thích (${likesCount})
+            </button>
+          </div>
+        </div>
+      `;
+      replyList.appendChild(div);
     });
   });
 }
@@ -366,35 +459,128 @@ window.toggleLike = async (statusId, uid, isLiked) => {
   }
 };
 
+window.toggleCommentLike = async (uid, statusId, commentId, isLiked) => {
+  if (!currentUser) {
+    showToast("Vui lòng đăng nhập để thích bình luận!");
+    return;
+  }
+  try {
+    const commentRef = doc(db, "users", uid, "statuses", statusId, "comments", commentId);
+    if (isLiked) {
+      await updateDoc(commentRef, {
+        likes: arrayRemove(currentUser.uid)
+      });
+      showToast("Đã bỏ thích bình luận.");
+    } else {
+      await updateDoc(commentRef, {
+        likes: arrayUnion(currentUser.uid)
+      });
+      showToast("Đã thích bình luận!");
+    }
+  } catch (error) {
+    showToast(`Lỗi khi thích bình luận: ${error.message}`);
+  }
+};
+
+window.toggleReplyLike = async (uid, statusId, commentId, replyId, isLiked) => {
+  if (!currentUser) {
+    showToast("Vui lòng đăng nhập để thích trả lời!");
+    return;
+  }
+  try {
+    const replyRef = doc(db, "users", uid, "statuses", statusId, "comments", commentId, "replies", replyId);
+    if (isLiked) {
+      await updateDoc(replyRef, {
+        likes: arrayRemove(currentUser.uid)
+      });
+      showToast("Đã bỏ thích trả lời.");
+    } else {
+      await updateDoc(replyRef, {
+        likes: arrayUnion(currentUser.uid)
+      });
+      showToast("Đã thích trả lời!");
+    }
+  } catch (error) {
+    showToast(`Lỗi khi thích trả lời: ${error.message}`);
+  }
+};
+
 window.toggleCommentSection = (sectionId) => {
   const section = document.getElementById(sectionId);
   section.style.display = section.style.display === "block" ? "none" : "block";
 };
 
-window.postComment = async (statusId, uid) => {
+window.showReplyInput = (inputId) => {
+  const inputSection = document.getElementById(inputId);
+  inputSection.classList.toggle("hidden");
+};
+
+window.postComment = async (statusId, uid, parentCommentId) => {
   if (!currentUser) {
     showToast("Vui lòng đăng nhập để bình luận!");
     return;
   }
-  const commentInput = document.getElementById(`comment-input-${statusId}`);
+  const inputId = parentCommentId ? `reply-input-${parentCommentId}` : `comment-input-${statusId}`;
+  const commentInput = document.querySelector(`#${inputId} textarea`);
   const commentText = commentInput.value.trim();
   if (!commentText) {
     showToast("Bình luận không được để trống!");
     return;
   }
   try {
-    const commentsRef = collection(db, "users", uid, "statuses", statusId, "comments");
-    await addDoc(commentsRef, {
+    const currentUserSnap = await getDoc(doc(db, "users", currentUser.uid));
+    const currentUserDataLocal = currentUserSnap.data() || {};
+    const commentData = {
       userId: currentUser.uid,
-      name: currentUserData.name || "Người dùng",
-      isVerified: currentUserData.isVerified || false,
+      name: currentUserDataLocal.name || "Người dùng",
+      isVerified: currentUserDataLocal.isVerified || false,
       text: commentText,
-      createdAt: new Date()
-    });
+      createdAt: new Date(),
+      likes: []
+    };
+    if (parentCommentId) {
+      const repliesRef = collection(db, "users", uid, "statuses", statusId, "comments", parentCommentId, "replies");
+      await addDoc(repliesRef, commentData);
+      showToast("Đã đăng trả lời!");
+    } else {
+      const commentsRef = collection(db, "users", uid, "statuses", statusId, "comments");
+      await addDoc(commentsRef, commentData);
+      showToast("Đã đăng bình luận!");
+    }
     commentInput.value = "";
-    showToast("Đã đăng bình luận!");
+    if (parentCommentId) {
+      document.getElementById(`reply-input-${parentCommentId}`).classList.add("hidden");
+    }
   } catch (error) {
     showToast(`Lỗi khi đăng bình luận: ${error.message}`);
+  }
+};
+
+window.deleteComment = async (uid, statusId, commentId) => {
+  if (!currentUser || profileUid !== currentUser.uid) {
+    showToast("Bạn không có quyền xóa bình luận này!");
+    return;
+  }
+  if (!confirm("Bạn có chắc muốn xóa bình luận này?")) return;
+  try {
+    await deleteDoc(doc(db, "users", uid, "statuses", statusId, "comments", commentId));
+    showToast("Xóa bình luận thành công!");
+  } catch (error) {
+    showToast(`Lỗi khi xóa bình luận: ${error.message}`);
+  }
+};
+
+window.deleteReply = async (uid, statusId, commentId, replyId) => {
+  if (!currentUser || profileUid !== currentUser.uid) {
+    showToast("Bạn không có quyền xóa trả lời này!");
+    return;
+  }
+  if (!confirm("Bạn có chắc muốn xóa trả lời này?")) return;
+  try {
+    await deleteDoc(doc(db, "users", uid, "statuses", statusId, "comments", commentId, "replies", replyId));
+    showToast("Xóa trả lời thành công!");
+  } catch (error) {
+    showToast(`Lỗi khi xóa trả lời: ${error.message}`);
   }
 };
 
@@ -506,7 +692,7 @@ onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   const urlParams = new URLSearchParams(window.location.search);
   profileUid = urlParams.get("uid") || user.uid;
-  const isOwnProfile = profileUid === user.uid;
+  isOwnProfile = profileUid === user.uid;
 
   try {
     const userSnap = await getDoc(doc(db, "users", profileUid));
@@ -521,6 +707,7 @@ onAuthStateChanged(auth, async (user) => {
     loadFriends(profileUid);
     loadStatuses(profileUid, isOwnProfile);
   } catch (error) {
+    console.error(`[Error] Failed to load profile:`, error);
     showToast(`Lỗi khi tải hồ sơ: ${error.message}`);
     window.location.href = "index.html";
   }
