@@ -135,8 +135,11 @@
       <button id="add-friend-button" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Thêm bạn</button>
     </div>
 
-    <div class="bg-white p-6 rounded-lg shadow-md">
-      <h2 class="text-xl font-semibold mb-4">Danh sách bạn bè</h2>
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-xl font-semibold">Danh sách bạn bè</h2>
+        <button onclick="window.location.href='hopthu.html'" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Hộp thư</button>
+      </div>
       <div id="friends-list"></div>
     </div>
 
@@ -193,7 +196,7 @@ function loadFriends(uid) {
           <span class="font-semibold">${data?.name || "Người dùng"}${data?.isVerified ? '<span class="verified-badge">✔</span>' : ""}</span>
         </div>
         <div class="flex gap-2">
-          <button onclick="window.location.href='profile.html?uid=${friendId}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
+          <button onclick="window.location.href      <button onclick="window.location.href='profile.html?uid=${friendId}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
           <button onclick="window.location.href='chat.html?uid=${friendId}'" class="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Nhắn tin</button>
         </div>
       `;
@@ -455,5 +458,6 @@ onAuthStateChanged(auth, async (user) => {
 });
 </script>
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932e1ca1ecc2c002',t:'MTc0NTA4MzYzOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932e42e8e94f7bae',t:'MTc0NTA4NTIwNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
