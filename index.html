@@ -42,6 +42,45 @@
       height: 100px;
       font-size: 2.5rem;
     }
+    .verified-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: linear-gradient(45deg, #00f, #0ff);
+      color: white;
+      font-size: 0.9rem;
+      margin-left: 5px;
+      position: relative;
+      transition: transform 0.2s ease;
+    }
+    .verified-badge:hover {
+      transform: scale(1.1);
+    }
+    .verified-badge:hover::after {
+      content: 'Đây là người nổi tiếng';
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2d3748;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      z-index: 10;
+    }
+    .dark-mode .verified-badge:hover::after {
+      background: #e2e8f0;
+      color: #1a202c;
+    }
+    @media (max-width: 640px) {
+      .verified-badge { width: 18px; height: 18px; font-size: 0.8rem; }
+      .verified-badge:hover::after { font-size: 0.7rem; top: -25px; }
+    }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-6">
@@ -127,8 +166,11 @@ const db = getFirestore(app);
 const ADMIN_EMAIL = "khoakenlol@gmail.com";
 
 function loadUserInfo(userData) {
-  document.getElementById("user-name").innerText = userData.name || "Người dùng";
-  document.getElementById("user-name").innerHTML += userData.isVerified ? " ✅" : "";
+  const userName = document.getElementById("user-name");
+  userName.innerText = userData.name || "Người dùng";
+  if (userData.isVerified) {
+    userName.innerHTML += `<span class="verified-badge">✔</span>`;
+  }
   document.getElementById("user-coins").innerText = `Xu: ${userData.balance || 0}`;
   const userPic = document.getElementById("user-pic");
   userPic.innerText = userData.name ? userData.name.charAt(0).toUpperCase() : "U";
@@ -148,7 +190,7 @@ function loadFriends(uid) {
       div.innerHTML = `
         <div class="flex items-center gap-3">
           <div class="avatar-initial">${data?.name ? data.name.charAt(0).toUpperCase() : "U"}</div>
-          <span class="font-semibold">${data?.name || "Người dùng"} ${data?.isVerified ? "✅" : ""}</span>
+          <span class="font-semibold">${data?.name || "Người dùng"}${data?.isVerified ? '<span class="verified-badge">✔</span>' : ""}</span>
         </div>
         <div class="flex gap-2">
           <button onclick="window.location.href='profile.html?uid=${friendId}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
@@ -412,5 +454,5 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932d5efc9fd9bd16',t:'MTc0NTA3NTg3MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
