@@ -23,7 +23,25 @@
     .dark-mode input, .dark-mode button, .dark-mode textarea { background: #4a5568; color: #e2e8f0; border-color: #718096; }
     .friend-item, .status-item { transition: all 0.2s ease; }
     .friend-item:hover, .status-item:hover { transform: translateY(-2px); }
-    .profile-pic { object-fit: cover; border: 2px solid #4a90e2; }
+    .avatar-initial {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #4a90e2;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      border: 2px solid #3578c6;
+    }
+    .avatar-initial-large {
+      width: 100px;
+      height: 100px;
+      font-size: 2.5rem;
+    }
     .status-input { resize: none; }
     .status-item { border: 1px solid #e2e8f0; border-radius: 8px; }
     .dark-mode .status-item { border-color: #4a5568; }
@@ -46,11 +64,11 @@
 
     <div class="bg-white p-6 rounded-lg shadow-md mb-6">
       <div class="flex items-center gap-6 mb-4">
-        <img id="profile-pic" src="https://via.placeholder.com/100" alt="Avatar" class="w-24 h-24 rounded-full profile-pic">
+        <div id="profile-pic" class="avatar-initial avatar-initial-large"></div>
         <div>
           <h3 id="profile-name" class="text-xl font-semibold"></h3>
           <input type="file" id="profile-pic-input" accept="image/*" class="hidden">
-          <button id="upload-pic-button" class="mt-2 bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Đổi ảnh</button>
+          <button id="upload-pic-button" class="mt-2 bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 hidden">Đổi ảnh</button>
         </div>
       </div>
       <button id="message-button" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 hidden">Nhắn tin</button>
@@ -111,9 +129,8 @@ let currentUserData = null;
 function loadProfile(userData, uid, isOwnProfile) {
   document.getElementById("profile-name").innerText = userData.name || "Người dùng";
   document.getElementById("profile-name").innerHTML += userData.isVerified ? " ✅" : "";
-  const profilePic = userData.profilePic || "https://via.placeholder.com/100";
-  document.getElementById("profile-pic").src = profilePic;
-  document.getElementById("upload-pic-button").style.display = isOwnProfile ? "block" : "none";
+  const profilePic = document.getElementById("profile-pic");
+  profilePic.innerText = userData.name ? userData.name.charAt(0).toUpperCase() : "U";
   document.getElementById("post-status-section").classList.toggle("hidden", !isOwnProfile);
   if (!isOwnProfile && uid !== currentUser.uid) {
     const messageButton = document.getElementById("message-button");
@@ -134,7 +151,10 @@ function loadFriends(uid) {
       const div = document.createElement("div");
       div.className = "friend-item bg-gray-50 p-3 rounded-lg flex justify-between items-center";
       div.innerHTML = `
-        <span class="font-semibold">${data?.name || "Người dùng"} ${data?.isVerified ? "✅" : ""}</span>
+        <div class="flex items-center gap-3">
+          <div class="avatar-initial">${data?.name ? data.name.charAt(0).toUpperCase() : "U"}</div>
+          <span class="font-semibold">${data?.name || "Người dùng"} ${data?.isVerified ? "✅" : ""}</span>
+        </div>
         <div class="flex gap-2">
           <button onclick="window.location.href='profile.html?uid=${friendId}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
           <button onclick="window.location.href='chat.html?uid=${friendId}'" class="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Nhắn tin</button>
@@ -171,7 +191,7 @@ function loadStatuses(uid, isOwnProfile) {
       const timeStr = formatTime(status.createdAt);
       div.innerHTML = `
         <div class="flex items-start gap-3">
-          <img src="${currentUserData?.profilePic || 'https://via.placeholder.com/40'}" alt="Avatar" class="w-10 h-10 rounded-full profile-pic">
+          <div class="avatar-initial">${currentUserData?.name ? currentUserData.name.charAt(0).toUpperCase() : "U"}</div>
           <div class="flex-1">
             <p class="status-text">${status.text}</p>
             <p class="status-time text-gray-500 mt-1">${timeStr}${status.updatedAt ? ' (Đã chỉnh sửa)' : ''}</p>
@@ -326,5 +346,5 @@ onAuthStateChanged(auth, async (user) => {
 });
 </script>
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932c0e112efa78d1',t:'MTc0NTA2MjA3MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932d5efd6f95677e',t:'MTc0NTA3NTg3MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
