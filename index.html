@@ -3,13 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ChatUp Professional</title>
+  <title>ChatUp</title>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="ChatUp" />
   <meta name="theme-color" content="#4a90e2" />
   <meta name="mobile-web-app-capable" content="yes" />
   <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
   <style>
@@ -19,343 +21,369 @@
     .dark-mode .bg-gray-100 { background: #1a202c; }
     .dark-mode .border-gray-200 { border-color: #4a5568; }
     .dark-mode input, .dark-mode button { background: #4a5568; color: #e2e8f0; border-color: #718096; }
-    .tab-button { transition: all 0.2s ease; }
-    .tab-button:hover { background: #2b6cb0; }
-    .friend-item, .request-item, .search-item, .pending-message-item { transition: all 0.2s ease; }
-    .friend-item:hover, .request-item:hover, .search-item:hover, .pending-message-item:hover { transform: translateY(-2px); }
-    .message { transition: all 0.2s ease; }
-    .message:hover { transform: translateY(-2px); }
-    .message.mine { margin-left: auto; border-bottom-right-radius: 0; }
-    .message.theirs { margin-right: auto; border-bottom-left-radius: 0; }
+    .friend-item { transition: all 0.2s ease; }
+    .friend-item:hover { transform: translateY(-2px); }
+    .profile-pic { object-fit: cover; border: 2px solid #4a90e2; }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-6">
   <div class="max-w-4xl mx-auto">
-    <h2 class="text-2xl font-semibold text-blue-600 mb-6">Khoaken Chat</h2>
-
-    <div id="auth" class="bg-white p-6 rounded-lg shadow-md">
-      <div class="flex gap-4 mb-4">
-        <button class="tab-button flex-1 bg-blue-600 text-white py-2 rounded-lg" onclick="switchTab('signup-tab')">Đăng ký</button>
-        <button class="tab-button flex-1 bg-blue-600 text-white py-2 rounded-lg" onclick="switchTab('login-tab')">Đăng nhập</button>
-      </div>
-      <div id="signup-tab" class="tab-content">
-        <input id="signup-email" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Email">
-        <input id="signup-pass" type="password" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Mật khẩu (>=6)">
-        <input id="signup-name" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Tên hiển thị">
-        <input id="signup-dob" type="date" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
-        <button onclick="signup()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Đăng ký</button>
-      </div>
-      <div id="login-tab" class="tab-content hidden">
-        <input id="login-email" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Email">
-        <input id="login-pass" type="password" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Mật khẩu">
-        <button onclick="login()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Đăng nhập</button>
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-3xl font-semibold text-blue-600">ChatUp</h1>
+      <div class="flex items-center gap-4">
+        <button id="dark-toggle" class="text-xl bg-transparent border-none">🌙</button>
+        <button id="logout-button" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Đăng xuất</button>
       </div>
     </div>
 
-    <div id="friends-ui" class="hidden">
-      <div class="flex items-center justify-between mb-6">
-        <p class="text-lg">Xin chào, <span id="username" class="font-semibold"></span>!</p>
-        <div class="flex items-center gap-4">
-          <button id="dark-toggle" class="text-xl bg-transparent border-none">🌙</button>
-          <button onclick="logout()" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Đăng xuất</button>
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <h2 class="text-xl font-semibold mb-4">Thông tin người dùng</h2>
+      <div class="flex items-center gap-6 mb-4">
+        <img id="user-pic" src="https://via.placeholder.com/100" alt="Avatar" class="w-24 h-24 rounded-full profile-pic">
+        <div>
+          <h3 id="user-name" class="text-lg font-semibold"></h3>
+          <p id="user-coins" class="text-gray-600"></p>
         </div>
       </div>
+      <button onclick="window.location.href='profile.html'" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Xem hồ sơ</button>
+    </div>
 
-      <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h3 class="text-lg font-semibold mb-4">Cập nhật hồ sơ</h3>
-        <input id="new-name" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Tên mới">
-        <button onclick="updateProfile()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Cập nhật</button>
+    <div id="admin-section" class="bg-white p-6 rounded-lg shadow-md mb-6 hidden">
+      <h2 class="text-xl font-semibold mb-4">Quản lý Admin</h2>
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">Cấp xu</label>
+        <input id="admin-email" type="email" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Email người dùng">
+        <input id="admin-coins" type="number" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Số xu">
+        <button id="admin-give-coins" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Cấp xu</button>
       </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">Rút xu</label>
+        <input id="admin-withdraw-email" type="email" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Email người dùng">
+        <input id="admin-withdraw-coins" type="number" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Số xu cần rút">
+        <button id="admin-withdraw-coins" class="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">Rút xu</button>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Quản lý tích xanh</label>
+        <input id="verify-email" type="email" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Email người dùng">
+        <div class="flex gap-2">
+          <button id="verify-button" class="flex-1 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Cấp tích xanh</button>
+          <button id="unverify-button" class="flex-1 bg-gray-600 text-white py-2 rounded-lg hover:bg-gray-700">Hủy tích xanh</button>
+        </div>
+      </div>
+    </div>
 
-      <div id="admin-ui" class="bg-white p-6 rounded-lg shadow-md mb-6 hidden">
-        <h3 class="text-lg font-semibold mb-4">Quản lý xu (Admin)</h3>
-        <input id="admin-user-email" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Email người dùng">
-        <input id="admin-coins" type="number" min="1" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Số xu cấp">
-        <button onclick="addCoins()" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">Cấp xu</button>
-      </div>
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <h2 class="text-xl font-semibold mb-4">Thêm bạn</h2>
+      <input id="friend-email" type="email" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Nhập email bạn bè">
+      <button id="add-friend-button" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Thêm bạn</button>
+    </div>
 
-      <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h3 class="text-lg font-semibold mb-4">Chơi Game Cá Cược</h3>
-        <button onclick="window.location.href='cacuoc.html'" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Vào Game</button>
-      </div>
+    <div class="bg-white p-6 rounded-lg shadow-md">
+      <h2 class="text-xl font-semibold mb-4">Danh sách bạn bè</h2>
+      <div id="friends-list"></div>
+    </div>
 
-      <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h3 class="text-lg font-semibold mb-4">Tin nhắn đang chờ</h3>
-        <div id="pending-messages"></div>
-      </div>
-
-      <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-        <input id="search-user" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Tìm email người dùng...">
-        <button onclick="searchUser()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Tìm kiếm</button>
-        <div id="search-result" class="mt-4"></div>
-      </div>
-
-      <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h3 class="text-lg font-semibold mb-4">Danh sách bạn bè</h3>
-        <div id="friends-list"></div>
-      </div>
-
-      <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-        <h3 class="text-lg font-semibold mb-4">Chờ xác nhận</h3>
-        <div id="pending-requests"></div>
-      </div>
-
-      <div id="chat-box" class="hidden bg-white p-6 rounded-lg shadow-md">
-        <h3 id="chat-with" class="text-lg font-semibold mb-4">Chat với ...</h3>
-        <div id="chat-messages" class="h-64 overflow-y-auto bg-gray-100 p-4 rounded-lg mb-4"></div>
-        <input id="chat-input" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Nhập tin nhắn...">
-        <button onclick="sendMessage()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Gửi</button>
-      </div>
+    <div class="mt-6">
+      <button onclick="window.location.href='cacuoc.html'" class="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700">Chơi Tài Xỉu</button>
     </div>
   </div>
 
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile as authUpdateProfile } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-  import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, query, where, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
-  import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-  const firebaseConfig = {
-    apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
-    authDomain: "chatup-7fed7.firebaseapp.com",
-    projectId: "chatup-7fed7",
-    storageBucket: "chatup-7fed7.appspot.com",
-    messagingSenderId: "287838782402",
-    appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
+  authDomain: "chatup-7fed7.firebaseapp.com",
+  projectId: "chatup-7fed7",
+  storageBucket: "chatup-7fed7.appspot.com",
+  messagingSenderId: "287838782402",
+  appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
+};
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-  const storage = getStorage(app);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-  const ADMIN_EMAIL = "khoakenlol@gmail.com"; // Define admin email
+const ADMIN_EMAIL = "khoakenlol@gmail.com";
 
-  window.switchTab = function(tabId) {
-    document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('hidden', el.id !== tabId));
-  }
+function loadUserInfo(userData) {
+  document.getElementById("user-name").innerText = userData.name || "Người dùng";
+  document.getElementById("user-name").innerHTML += userData.isVerified ? " ✅" : "";
+  document.getElementById("user-coins").innerText = `Xu: ${userData.coins || 0}`;
+  const userPic = document.getElementById("user-pic");
+  userPic.src = userData.profilePic || "https://via.placeholder.com/100";
+}
 
-  async function signup() {
-    const email = document.getElementById("signup-email").value.trim();
-    const pass = document.getElementById("signup-pass").value.trim();
-    const name = document.getElementById("signup-name").value.trim();
-    const dob = document.getElementById("signup-dob").value.trim();
-    if (!email || !pass || !name || !dob) return alert("Vui lòng điền đầy đủ.");
-
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      await setDoc(doc(db, "users", cred.user.uid), { name, dob, email, balance: 1000 });
-      alert("Đăng ký thành công!");
-    } catch (err) {
-      alert("Lỗi: " + err.message);
+function loadFriends(uid) {
+  const friendsList = document.getElementById("friends-list");
+  const friendsRef = collection(db, "friends", uid, "list");
+  onSnapshot(friendsRef, async (snapshot) => {
+    friendsList.innerHTML = "";
+    for (const docSnap of snapshot.docs) {
+      const friendId = docSnap.id;
+      const userSnap = await getDoc(doc(db, "users", friendId));
+      const data = userSnap.data();
+      const div = document.createElement("div");
+      div.className = "friend-item bg-gray-50 p-3 rounded-lg flex justify-between items-center mb-2";
+      div.innerHTML = `
+        <span class="font-semibold">${data?.name || "Người dùng"} ${data?.isVerified ? "✅" : ""}</span>
+        <div class="flex gap-2">
+          <button onclick="window.location.href='profile.html?uid=${friendId}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
+          <button onclick="window.location.href='chat.html?uid=${friendId}'" class="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Nhắn tin</button>
+        </div>
+      `;
+      friendsList.appendChild(div);
     }
-  }
+  });
+}
 
-  async function login() {
-    const email = document.getElementById("login-email").value.trim();
-    const pass = document.getElementById("login-pass").value.trim();
-    if (!email || !pass) return alert("Nhập đầy đủ email và mật khẩu.");
-
-    try {
-      await signInWithEmailAndPassword(auth, email, pass);
-    } catch (err) {
-      alert("Lỗi: " + err.message);
-    }
-  }
-
-  async function logout() {
+document.getElementById("logout-button").addEventListener("click", async () => {
+  try {
     await signOut(auth);
-    location.reload();
+    window.location.href = "login.html";
+  } catch (error) {
+    alert(`Lỗi khi đăng xuất: ${error.message}`);
+  }
+});
+
+document.getElementById("add-friend-button").addEventListener("click", async () => {
+  const friendEmail = document.getElementById("friend-email").value.trim();
+  if (!friendEmail) {
+    alert("Vui lòng nhập email bạn bè!");
+    return;
   }
 
-  window.searchUser = async function() {
-    const email = document.getElementById('search-user').value.trim();
-    if (!email) return;
-    const q = query(collection(db, "users"), where("email", "==", email));
-    const snapshot = await getDocs(q);
-    const resultDiv = document.getElementById('search-result');
-    resultDiv.innerHTML = '';
+  try {
+    const usersRef = collection(db, "users");
+    const userSnap = await getDocs(usersRef);
+    let friendUid = null;
+    userSnap.forEach(doc => {
+      if (doc.data().email === friendEmail) {
+        friendUid = doc.id;
+      }
+    });
 
-    if (snapshot.empty) {
-      resultDiv.innerText = "Không tìm thấy người dùng.";
+    if (!friendUid) {
+      alert("Không tìm thấy người dùng với email này!");
       return;
     }
 
-    snapshot.forEach(docSnap => {
-      const data = docSnap.data();
-      const uid = docSnap.id;
-      const div = document.createElement('div');
-      div.className = 'search-item bg-gray-50 p-3 rounded-lg flex justify-between items-center';
-      div.innerHTML = `<span class="font-semibold">${data.name}</span> (${data.email}) <button onclick="sendFriendRequest('${uid}')" class="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Kết bạn</button>`;
-      resultDiv.appendChild(div);
-    });
-  }
-
-  window.sendFriendRequest = async function(targetUid) {
-    const user = auth.currentUser;
-    if (!user) return;
-    await setDoc(doc(db, "friend_requests", `${user.uid}_${targetUid}`), { from: user.uid, to: targetUid, status: "pending" });
-    alert("Đã gửi lời mời!");
-  }
-
-  window.acceptFriendRequest = async function(requestId, fromUid) {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    await setDoc(doc(db, "friends", user.uid, "list", fromUid), { since: new Date() });
-    await setDoc(doc(db, "friends", fromUid, "list", user.uid), { since: new Date() });
-
-    await updateDoc(doc(db, "friend_requests", requestId), { status: "accepted" });
-    alert("Đã chấp nhận!");
-  }
-
-  async function loadFriendsAndRequests(uid) {
-    const friendsList = document.getElementById('friends-list');
-    const pendingList = document.getElementById('pending-requests');
-
-    const friendsRef = collection(db, "friends", uid, "list");
-    onSnapshot(friendsRef, async (snapshot) => {
-      friendsList.innerHTML = '';
-      snapshot.forEach(async (docSnap) => {
-        const friendId = docSnap.id;
-        const userSnap = await getDoc(doc(db, "users", friendId));
-        const data = userSnap.data();
-        const div = document.createElement('div');
-        div.className = 'friend-item bg-gray-50 p-3 rounded-lg flex justify-between items-center';
-        div.innerHTML = `<span class="font-semibold">${data?.name || "Người dùng"}</span> <button onclick="openChatPage('${friendId}')" class="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Nhắn tin</button>`;
-        friendsList.appendChild(div);
-      });
-    });
-
-    const requestsRef = collection(db, "friend_requests");
-    const q2 = query(requestsRef, where("to", "==", uid), where("status", "==", "pending"));
-    onSnapshot(q2, (snapshot) => {
-      pendingList.innerHTML = '';
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        const fromUid = data.from;
-        const div = document.createElement('div');
-        div.className = 'request-item bg-gray-50 p-3 rounded-lg flex justify-between items-center';
-        div.innerHTML = `<span class="font-semibold">${fromUid}</span> <button onclick="acceptFriendRequest('${docSnap.id}', '${fromUid}')" class="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Chấp nhận</button>`;
-        pendingList.appendChild(div);
-      });
-    });
-  }
-
-  async function loadPendingMessages(uid) {
-    const pendingMessagesList = document.getElementById('pending-messages');
-    const chatsRef = collection(db, "chats");
-    const q = query(chatsRef, where("participants", "array-contains", uid));
-
-    onSnapshot(q, async (snapshot) => {
-      pendingMessagesList.innerHTML = '';
-      for (const docSnap of snapshot.docs) {
-        const chatData = docSnap.data();
-        const chatId = docSnap.id;
-        const messagesRef = collection(db, "chats", chatId, "messages");
-        const messagesQuery = query(messagesRef, orderBy("createdAt", "desc"));
-        const messagesSnapshot = await getDocs(messagesQuery);
-
-        if (!messagesSnapshot.empty) {
-          const lastMessage = messagesSnapshot.docs[0].data();
-          if (lastMessage.sender !== uid) {
-            const senderId = lastMessage.sender;
-            const senderSnap = await getDoc(doc(db, "users", senderId));
-            const senderData = senderSnap.data();
-            const div = document.createElement('div');
-            div.className = 'pending-message-item bg-gray-50 p-3 rounded-lg flex justify-between items-center';
-            div.innerHTML = `
-              <span class="font-semibold">${senderData?.name || "Người dùng"}: ${lastMessage.text.slice(0, 30)}${lastMessage.text.length > 30 ? '...' : ''}</span>
-              <button onclick="openChatPage('${senderId}')" class="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Trả lời</button>
-            `;
-            pendingMessagesList.appendChild(div);
-          }
-        }
-      }
-    });
-  }
-
-  window.updateProfile = async function() {
-    const user = auth.currentUser;
-    if (!user) return;
-    const name = document.getElementById('new-name').value.trim();
-
-    const userDoc = doc(db, "users", user.uid);
-    const updates = {};
-
-    if (name) updates.name = name;
-
-    if (name) {
-      await authUpdateProfile(user, { displayName: name });
+    if (friendUid === auth.currentUser.uid) {
+      alert("Bạn không thể thêm chính mình!");
+      return;
     }
 
-    await updateDoc(userDoc, updates);
-    if (name) document.getElementById('username').innerText = name;
-    alert("Cập nhật thành công!");
+    await setDoc(doc(db, "friends", auth.currentUser.uid, "list", friendUid), { added: true });
+    document.getElementById("friend-email").value = "";
+    alert("Thêm bạn thành công!");
+  } catch (error) {
+    alert(`Lỗi khi thêm bạn: ${error.message}`);
+  }
+});
+
+document.getElementById("admin-give-coins").addEventListener("click", async () => {
+  const email = document.getElementById("admin-email").value.trim();
+  const coins = parseInt(document.getElementById("admin-coins").value);
+  if (!email || isNaN(coins) || coins <= 0) {
+    alert("Vui lòng nhập email và số xu hợp lệ!");
+    return;
   }
 
-  window.addCoins = async function() {
-    const user = auth.currentUser;
-    if (!user || user.email !== ADMIN_EMAIL) return alert("Chỉ admin mới có quyền cấp xu!");
-
-    const email = document.getElementById('admin-user-email').value.trim();
-    const coins = parseInt(document.getElementById('admin-coins').value);
-
-    if (!email) return alert("Vui lòng nhập email người dùng.");
-    if (!coins || coins <= 0) return alert("Số xu phải lớn hơn 0.");
-
-    const q = query(collection(db, "users"), where("email", "==", email));
-    const snapshot = await getDocs(q);
-
-    if (snapshot.empty) return alert("Không tìm thấy người dùng với email này.");
-
-    const userDoc = snapshot.docs[0];
-    const currentBalance = userDoc.data().balance || 0;
-    const newBalance = currentBalance + coins;
-
-    await updateDoc(doc(db, "users", userDoc.id), { balance: newBalance });
-    alert(`Đã cấp ${coins} xu cho ${email}. Số dư mới: ${newBalance} xu.`);
-  }
-
-  window.openChatPage = function(friendId) {
-    window.location.href = `chat.html?uid=${friendId}`;
-  }
-
-  onAuthStateChanged(auth, async (user) => {
-    if (user) {
-      document.getElementById("auth").classList.add("hidden");
-      document.getElementById("friends-ui").classList.remove("hidden");
-      const userSnap = await getDoc(doc(db, "users", user.uid));
-      const userData = userSnap.data();
-      document.getElementById("username").innerText = userData.name;
-      
-      // Show admin UI if the user is admin
-      if (user.email === ADMIN_EMAIL) {
-        document.getElementById("admin-ui").classList.remove("hidden");
-      } else {
-        document.getElementById("admin-ui").classList.add("hidden");
+  try {
+    const usersRef = collection(db, "users");
+    const userSnap = await getDocs(usersRef);
+    let targetUid = null;
+    userSnap.forEach(doc => {
+      if (doc.data().email === email) {
+        targetUid = doc.id;
       }
+    });
 
-      loadFriendsAndRequests(user.uid);
-      loadPendingMessages(user.uid);
-    } else {
-      document.getElementById("auth").classList.remove("hidden");
-      document.getElementById("friends-ui").classList.add("hidden");
-      document.getElementById("admin-ui").classList.add("hidden");
+    if (!targetUid) {
+      alert("Không tìm thấy người dùng với email này!");
+      return;
     }
-  });
 
-  document.getElementById("dark-toggle").addEventListener("click", () => {
-    document.body.classList.toggle("dark-mode");
-    localStorage.setItem("theme", document.body.classList.contains("dark-mode") ? "dark" : "light");
-  });
+    const userRef = doc(db, "users", targetUid);
+    const userDoc = await getDoc(userRef);
+    const currentCoins = userDoc.data().coins || 0;
+    await updateDoc(userRef, { coins: currentCoins + coins });
+    alert(`Cấp ${coins} xu cho ${email} thành công!`);
+    document.getElementById("admin-email").value = "";
+    document.getElementById("admin-coins").value = "";
+  } catch (error) {
+    alert(`Lỗi khi cấp xu: ${error.message}`);
+  }
+});
 
-  if (localStorage.getItem("theme") === "dark") document.body.classList.add("dark-mode");
+document.getElementById("admin-withdraw-coins").addEventListener("click", async () => {
+  const email = document.getElementById("admin-withdraw-email").value.trim();
+  const coins = parseInt(document.getElementById("admin-withdraw-coins").value);
+  if (!email || isNaN(coins) || coins <= 0) {
+    alert("Vui lòng nhập email và số xu hợp lệ!");
+    return;
+  }
 
-  window.signup = signup;
-  window.login = login;
-  window.logout = logout;
+  try {
+    const usersRef = collection(db, "users");
+    const userSnap = await getDocs(usersRef);
+    let targetUid = null;
+    userSnap.forEach(doc => {
+      if (doc.data().email === email) {
+        targetUid = doc.id;
+      }
+    });
+
+    if (!targetUid) {
+      alert("Không tìm thấy người dùng với email này!");
+      return;
+    }
+
+    const userRef = doc(db, "users", targetUid);
+    const userDoc = await getDoc(userRef);
+    const currentCoins = userDoc.data().coins || 0;
+    if (currentCoins < coins) {
+      alert(`Số xu hiện tại (${currentCoins}) không đủ để rút ${coins} xu!`);
+      return;
+    }
+
+    await updateDoc(userRef, { coins: currentCoins - coins });
+    alert(`Rút ${coins} xu từ ${email} thành công!`);
+    document.getElementById("admin-withdraw-email").value = "";
+    document.getElementById("admin-withdraw-coins").value = "";
+  } catch (error) {
+    alert(`Lỗi khi rút xu: ${error.message}`);
+  }
+});
+
+document.getElementById("verify-button").addEventListener("click", async () => {
+  const email = document.getElementById("verify-email").value.trim();
+  if (!email) {
+    alert("Vui lòng nhập email người dùng!");
+    return;
+  }
+
+  try {
+    const usersRef = collection(db, "users");
+    const userSnap = await getDocs(usersRef);
+    let targetUid = null;
+    userSnap.forEach(doc => {
+      if (doc.data().email === email) {
+        targetUid = doc.id;
+      }
+    });
+
+    if (!targetUid) {
+      alert("Không tìm thấy người dùng với email này!");
+      return;
+    }
+
+    const userRef = doc(db, "users", targetUid);
+    await updateDoc(userRef, { isVerified: true });
+    alert(`Cấp tích xanh cho ${email} thành công!`);
+    document.getElementById("verify-email").value = "";
+  } catch (error) {
+    alert(`Lỗi khi cấp tích xanh: ${error.message}`);
+  }
+});
+
+document.getElementById("unverify-button").addEventListener("click", async () => {
+  const email = document.getElementById("verify-email").value.trim();
+  if (!email) {
+    alert("Vui lòng nhập email người dùng!");
+    return;
+  }
+
+  try {
+    const usersRef = collection(db, "users");
+    const userSnap = await getDocs(usersRef);
+    let targetUid = null;
+    userSnap.forEach(doc => {
+      if (doc.data().email === email) {
+        targetUid = doc.id;
+      }
+    });
+
+    if (!targetUid) {
+      alert("Không tìm thấy người dùng với email này!");
+      return;
+    }
+
+    const userRef = doc(db, "users", targetUid);
+    await updateDoc(userRef, { isVerified: false });
+    alert(`Hủy tích xanh cho ${email} thành công!`);
+    document.getElementById("verify-email").value = "";
+  } catch (error) {
+    alert(`Lỗi khi hủy tích xanh: ${error.message}`);
+  }
+});
+
+document.getElementById("verify-email").addEventListener("input", async () => {
+  const email = document.getElementById("verify-email").value.trim();
+  if (!email) {
+    document.getElementById("verify-button").innerText = "Cấp tích xanh";
+    return;
+  }
+
+  try {
+    const usersRef = collection(db, "users");
+    const userSnap = await getDocs(usersRef);
+    let targetUid = null;
+    userSnap.forEach(doc => {
+      if (doc.data().email === email) {
+        targetUid = doc.id;
+      }
+    });
+
+    if (targetUid) {
+      const userDoc = await getDoc(doc(db, "users", targetUid));
+      const isVerified = userDoc.data().isVerified || false;
+      document.getElementById("verify-button").innerText = isVerified ? "Cấp lại tích xanh" : "Cấp tích xanh";
+    }
+  } catch (error) {
+    console.error("Lỗi khi kiểm tra trạng thái tích xanh:", error);
+  }
+});
+
+document.getElementById("dark-toggle").addEventListener("click", () => {
+  document.body.classList.toggle("dark-mode");
+  localStorage.setItem("theme", document.body.classList.contains("dark-mode") ? "dark" : "light");
+});
+
+if (localStorage.getItem("theme") === "dark") document.body.classList.add("dark-mode");
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    window.location.href = "login.html";
+    return;
+  }
+
+  try {
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+    if (!userSnap.exists()) {
+      await setDoc(userRef, {
+        name: user.displayName || "Người dùng",
+        email: user.email,
+        coins: 0,
+        isVerified: false
+      });
+    }
+    const userData = userSnap.exists() ? userSnap.data() : (await getDoc(userRef)).data();
+    loadUserInfo(userData);
+    loadFriends(user.uid);
+
+    if (user.email === ADMIN_EMAIL) {
+      document.getElementById("admin-section").classList.remove("hidden");
+    }
+  } catch (error) {
+    alert(`Lỗi khi tải thông tin: ${error.message}`);
+    window.location.href = "login.html";
+  }
+});
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9328ca2ff83ebd5e',t:'MTc0NTAyNzgzMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9328e43a1ae46753',t:'MTc0NTAyODg5OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932c0e111e5a4564',t:'MTc0NTA2MjA3MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+</body>
 </html>
