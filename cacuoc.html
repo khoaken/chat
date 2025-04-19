@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Game Cá Cược - ChatUp</title>
+  <title>Game Tài Xỉu & Chẵn Lẻ - ChatUp</title>
   <meta name="theme-color" content="#4a90e2" />
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
@@ -16,12 +16,18 @@
     .dark-mode input, .dark-mode button { background: #4a5568; color: #e2e8f0; border-color: #718096; }
     .bet-button { transition: all 0.2s ease; }
     .bet-button:hover { background: #2b6cb0; }
+    .dice { font-size: 2rem; margin: 0 0.5rem; }
+    .dice-rolling { animation: spin 0.5s linear infinite; }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-6">
   <div class="max-w-4xl mx-auto">
     <div class="flex items-center justify-between mb-6">
-      <h2 class="text-2xl font-semibold text-blue-600">Game Cá Cược</h2>
+      <h2 class="text-2xl font-semibold text-blue-600">Game Tài Xỉu & Chẵn Lẻ</h2>
       <div class="flex items-center gap-4">
         <button id="dark-toggle" class="text-xl bg-transparent border-none">🌙</button>
         <button onclick="window.location.href='index.html'" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Quay lại</button>
@@ -30,8 +36,13 @@
 
     <div id="game-ui" class="bg-white p-6 rounded-lg shadow-md">
       <p class="text-lg mb-4">Số dư: <span id="balance" class="font-semibold">0</span> xu</p>
-      <h3 class="text-lg font-semibold mb-4">Đoán số (1-10)</h3>
-      <input id="bet-number" type="number" min="1" max="10" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Chọn số (1-10)">
+      <h3 class="text-lg font-semibold mb-4">Chơi Tài Xỉu & Chẵn Lẻ</h3>
+      <div class="grid grid-cols-2 gap-4 mb-4">
+        <button id="bet-tai" class="bet-button bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700" onclick="selectBet('tai')">Tài (11-18)</button>
+        <button id="bet-xiu" class="bet-button bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700" onclick="selectBet('xiu')">Xỉu (3-10)</button>
+        <button id="bet-chan" class="bet-button bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700" onclick="selectBet('chan')">Chẵn</button>
+        <button id="bet-le" class="bet-button bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700" onclick="selectBet('le')">Lẻ</button>
+      </div>
       <input id="bet-amount" type="number" min="10" step="10" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Số xu cược (tối thiểu 10)">
       <button onclick="placeBet()" class="bet-button w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Đặt cược</button>
       <div id="bet-result" class="mt-4"></div>
@@ -56,6 +67,8 @@
   const auth = getAuth(app);
   const db = getFirestore(app);
 
+  let selectedBet = null;
+
   async function loadBalance(uid) {
     const userDoc = await getDoc(doc(db, "users", uid));
     const balance = userDoc.data().balance || 0;
@@ -63,25 +76,46 @@
     return balance;
   }
 
+  window.selectBet = function(type) {
+    selectedBet = type;
+    const buttons = ['tai', 'xiu', 'chan', 'le'];
+    buttons.forEach(b => {
+      document.getElementById(`bet-${b}`).classList.toggle("bg-blue-800", b === type);
+      document.getElementById(`bet-${b}`).classList.toggle("bg-blue-600", b !== type);
+    });
+  }
+
   window.placeBet = async function() {
     const user = auth.currentUser;
     if (!user) return alert("Vui lòng đăng nhập để chơi!");
 
-    const number = parseInt(document.getElementById("bet-number").value);
     const amount = parseInt(document.getElementById("bet-amount").value);
     const resultDiv = document.getElementById("bet-result");
 
-    if (!number || number < 1 || number > 10) return alert("Vui lòng chọn số từ 1 đến 10.");
+    if (!selectedBet) return alert("Vui lòng chọn Tài, Xỉu, Chẵn hoặc Lẻ.");
     if (!amount || amount < 10 || amount % 10 !== 0) return alert("Số xu cược phải lớn hơn hoặc bằng 10 và là bội số của 10.");
 
     const balance = await loadBalance(user.uid);
     if (amount > balance) return alert("Số dư không đủ!");
 
-    const randomNumber = Math.floor(Math.random() * 10) + 1;
-    let newBalance = balance;
-    let message = `Kết quả: ${randomNumber}. `;
+    // Start dice roll animation
+    resultDiv.innerHTML = `<p class="text-lg">Đang lắc xúc xắc... <span class="dice dice-rolling">🎲</span><span class="dice dice-rolling">🎲</span><span class="dice dice-rolling">🎲</span></p>`;
+    
+    // Simulate roll with delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
-    if (number === randomNumber) {
+    // Roll three dice
+    const dice1 = Math.floor(Math.random() * 6) + 1;
+    const dice2 = Math.floor(Math.random() * 6) + 1;
+    const dice3 = Math.floor(Math.random() * 6) + 1;
+    const total = dice1 + dice2 + dice3;
+    const taiXiuOutcome = total >= 11 && total <= 18 ? "tai" : "xiu";
+    const chanLeOutcome = total % 2 === 0 ? "chan" : "le";
+
+    let newBalance = balance;
+    let message = `Kết quả: <span class="dice">${dice1}</span><span class="dice">${dice2}</span><span class="dice">${dice3}</span> (Tổng: ${total} - ${taiXiuOutcome === "tai" ? "Tài" : "Xỉu"}, ${chanLeOutcome === "chan" ? "Chẵn" : "Lẻ"}). `;
+
+    if (selectedBet === taiXiuOutcome || selectedBet === chanLeOutcome) {
       newBalance += amount * 2; // Win: double the bet
       message += `Bạn thắng! Nhận được ${amount * 2} xu.`;
     } else {
