@@ -181,7 +181,10 @@
           <button id="upload-pic-button" class="mt-2 bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700 hidden">Đổi ảnh</button>
         </div>
       </div>
-      <button id="message-button" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 hidden">Nhắn tin</button>
+      <div class="flex gap-4">
+        <button id="message-button" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 hidden">Nhắn tin</button>
+        <button id="add-friend-button" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 hidden">Kết bạn</button>
+      </div>
     </div>
 
     <div id="post-status-section" class="bg-white p-6 rounded-lg shadow-md mb-6 hidden">
@@ -245,7 +248,7 @@ function showToast(message) {
   setTimeout(() => toast.remove(), 3000);
 }
 
-function loadProfile(userData, uid, isOwnProfile) {
+function loadProfile(userData, uid, isOwnProfile, isFriend) {
   const profileName = document.getElementById("profile-name");
   profileName.innerText = userData.name || "Người dùng";
   if (userData.isVerified) {
@@ -254,10 +257,24 @@ function loadProfile(userData, uid, isOwnProfile) {
   const profilePic = document.getElementById("profile-pic");
   profilePic.innerText = userData.name ? userData.name.charAt(0).toUpperCase() : "U";
   document.getElementById("post-status-section").classList.toggle("hidden", !isOwnProfile);
+  document.getElementById("upload-pic-button").classList.toggle("hidden", !isOwnProfile);
   if (!isOwnProfile && uid !== currentUser.uid) {
     const messageButton = document.getElementById("message-button");
     messageButton.classList.remove("hidden");
     messageButton.onclick = () => window.location.href = `chat.html?uid=${uid}`;
+    if (!isFriend) {
+      const addFriendButton = document.getElementById("add-friend-button");
+      addFriendButton.classList.remove("hidden");
+      addFriendButton.onclick = async () => {
+        try {
+          await setDoc(doc(db, "friends", currentUser.uid, "list", uid), { added: true });
+          addFriendButton.classList.add("hidden");
+          showToast("Thêm bạn thành công!");
+        } catch (error) {
+          showToast(`Lỗi khi thêm bạn: ${error.message}`);
+        }
+      };
+    }
   }
 }
 
@@ -750,7 +767,13 @@ onAuthStateChanged(auth, async (user) => {
     }
     const userData = userSnap.data();
     currentUserData = userData;
-    loadProfile(userData, profileUid, isOwnProfile);
+    // Kiểm tra xem profileUid có phải là bạn bè không
+    let isFriend = false;
+    if (!isOwnProfile) {
+      const friendDoc = await getDoc(doc(db, "friends", user.uid, "list", profileUid));
+      isFriend = friendDoc.exists();
+    }
+    loadProfile(userData, profileUid, isOwnProfile, isFriend);
     loadFriends(profileUid);
     loadStatuses(profileUid, isOwnProfile);
   } catch (error) {
@@ -760,6 +783,6 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932df4c1cbf4bcf2',t:'MTc0NTA4MjAwNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932e645a3d67b06f',t:'MTc0NTA4NjU3NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
