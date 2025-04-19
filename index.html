@@ -21,8 +21,8 @@
     .dark-mode .bg-gray-100 { background: #1a202c; }
     .dark-mode .border-gray-200 { border-color: #4a5568; }
     .dark-mode input, .dark-mode button { background: #4a5568; color: #e2e8f0; border-color: #718096; }
-    .friend-item { transition: all 0.2s ease; }
-    .friend-item:hover { transform: translateY(-2px); }
+    .friend-item, .suggestion-item, .request-item { transition: all 0.2s ease; }
+    .friend-item:hover, .suggestion-item:hover, .request-item:hover { transform: translateY(-2px); }
     .avatar-initial {
       width: 40px;
       height: 40px;
@@ -76,6 +76,22 @@
     .dark-mode .verified-badge:hover::after {
       background: #e2e8f0;
       color: #1a202c;
+    }
+    .toast {
+      position: fixed;
+      bottom: calc(20px + env(safe-area-inset-bottom));
+      right: calc(20px + env(safe-area-inset-right));
+      background: #4a90e2;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      z-index: 100;
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
     }
     @media (max-width: 640px) {
       .verified-badge { width: 18px; height: 18px; font-size: 0.8rem; }
@@ -136,6 +152,21 @@
     </div>
 
     <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <h2 class="text-xl font-semibold mb-4">Lời mời kết bạn</h2>
+      <div id="friend-requests-list"></div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <h2 class="text-xl font-semibold mb-4">Lời mời kết bạn đã gửi</h2>
+      <div id="sent-friend-requests-list"></div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <h2 class="text-xl font-semibold mb-4">Gợi ý kết bạn</h2>
+      <div id="suggestions-list"></div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-xl font-semibold">Danh sách bạn bè</h2>
         <button onclick="window.location.href='hopthu.html'" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Hộp thư</button>
@@ -151,7 +182,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, setDoc, addDoc, deleteDoc, updateDoc, onSnapshot, getDocs, query, orderBy, where, collectionGroup } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
@@ -167,6 +198,14 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 
 const ADMIN_EMAIL = "khoakenlol@gmail.com";
+
+function showToast(message) {
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.innerText = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
 
 function loadUserInfo(userData) {
   const userName = document.getElementById("user-name");
@@ -193,10 +232,10 @@ function loadFriends(uid) {
       div.innerHTML = `
         <div class="flex items-center gap-3">
           <div class="avatar-initial">${data?.name ? data.name.charAt(0).toUpperCase() : "U"}</div>
-          <span class="font-semibold">${data?.name || "Người dùng"}${data?.isVerified ? '<span class="verified-badge">✔</span>' : ""}</span>
+          <a href="profile.html?uid=${friendId}" class="font-semibold hover:underline">${data?.name || "Người dùng"}${data?.isVerified ? '<span class="verified-badge">✔</span>' : ""}</a>
         </div>
         <div class="flex gap-2">
-          <button onclick="window.location.href      <button onclick="window.location.href='profile.html?uid=${friendId}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
+          <button onclick="window.location.href='profile.html?uid=${friendId}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
           <button onclick="window.location.href='chat.html?uid=${friendId}'" class="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Nhắn tin</button>
         </div>
       `;
@@ -205,47 +244,219 @@ function loadFriends(uid) {
   });
 }
 
+function loadFriendSuggestions(uid) {
+  const suggestionsList = document.getElementById("suggestions-list");
+  const usersRef = collection(db, "users");
+  const friendsRef = collection(db, "friends", uid, "list");
+  const requestsRef = collection(db, "friend_requests", uid, "requests");
+
+  onSnapshot(friendsRef, async (friendsSnapshot) => {
+    const friendIds = friendsSnapshot.docs.map(doc => doc.id);
+    const requestsSnapshot = await getDocs(requestsRef);
+    const sentRequestIds = requestsSnapshot.docs.map(doc => doc.data().senderUid);
+    const usersSnapshot = await getDocs(usersRef);
+    const suggestions = [];
+
+    usersSnapshot.forEach(doc => {
+      const userId = doc.id;
+      const userData = doc.data();
+      if (userId !== uid && !friendIds.includes(userId) && !sentRequestIds.includes(userId)) {
+        suggestions.push({ uid: userId, ...userData });
+      }
+    });
+
+    suggestionsList.innerHTML = "";
+    if (suggestions.length === 0) {
+      suggestionsList.innerHTML = `<p class="text-gray-500 text-center">Không có gợi ý kết bạn.</p>`;
+      return;
+    }
+
+    suggestions.slice(0, 5).forEach(user => {
+      const div = document.createElement("div");
+      div.className = "suggestion-item bg-gray-50 p-3 rounded-lg flex justify-between items-center mb-2";
+      div.innerHTML = `
+        <div class="flex items-center gap-3">
+          <div class="avatar-initial">${user.name ? user.name.charAt(0).toUpperCase() : "U"}</div>
+          <a href="profile.html?uid=${user.uid}" class="font-semibold hover:underline">${user.name || "Người dùng"}${user.isVerified ? '<span class="verified-badge">✔</span>' : ""}</a>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="window.location.href='profile.html?uid=${user.uid}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
+          <button onclick="window.addFriendSuggestion('${user.uid}')" class="bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700">Kết bạn</button>
+        </div>
+      `;
+      suggestionsList.appendChild(div);
+    });
+  });
+}
+
+function loadFriendRequests(uid) {
+  const requestsList = document.getElementById("friend-requests-list");
+  const requestsRef = collection(db, "friend_requests", uid, "requests");
+  const q = query(requestsRef, orderBy("createdAt", "desc"));
+  onSnapshot(q, async (snapshot) => {
+    requestsList.innerHTML = "";
+    if (snapshot.empty) {
+      requestsList.innerHTML = `<p class="text-gray-500 text-center">Không có lời mời kết bạn.</p>`;
+      return;
+    }
+    for (const docSnap of snapshot.docs) {
+      const request = docSnap.data();
+      const requestId = docSnap.id;
+      const userSnap = await getDoc(doc(db, "users", request.senderUid));
+      const userData = userSnap.data() || {};
+      const div = document.createElement("div");
+      div.className = "request-item bg-gray-50 p-3 rounded-lg flex justify-between items-center mb-2";
+      div.innerHTML = `
+        <div class="flex items-center gap-3">
+          <div class="avatar-initial">${request.senderName ? request.senderName.charAt(0).toUpperCase() : "U"}</div>
+          <a href="profile.html?uid=${request.senderUid}" class="font-semibold hover:underline">${request.senderName || "Người dùng"}${userData.isVerified ? '<span class="verified-badge">✔</span>' : ""}</a>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="window.location.href='profile.html?uid=${request.senderUid}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
+          <button onclick="window.acceptFriendRequest('${requestId}', '${request.senderUid}', '${uid}')" class="bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700">Đồng ý</button>
+          <button onclick="window.rejectFriendRequest('${requestId}', '${uid}')" class="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700">Hủy</button>
+        </div>
+      `;
+      requestsList.appendChild(div);
+    }
+  });
+}
+
+function loadSentFriendRequests(uid) {
+  const sentRequestsList = document.getElementById("sent-friend-requests-list");
+  const q = query(collectionGroup(db, "requests"), where("senderUid", "==", uid));
+  onSnapshot(q, async (snapshot) => {
+    sentRequestsList.innerHTML = "";
+    if (snapshot.empty) {
+      sentRequestsList.innerHTML = `<p class="text-gray-500 text-center">Không có lời mời kết bạn đã gửi.</p>`;
+      return;
+    }
+    for (const docSnap of snapshot.docs) {
+      const request = docSnap.data();
+      const requestId = docSnap.id;
+      const receiverUid = docSnap.ref.parent.parent.id;
+      const userSnap = await getDoc(doc(db, "users", receiverUid));
+      const userData = userSnap.data() || {};
+      const div = document.createElement("div");
+      div.className = "request-item bg-gray-50 p-3 rounded-lg flex justify-between items-center mb-2";
+      div.innerHTML = `
+        <div class="flex items-center gap-3">
+          <div class="avatar-initial">${userData.name ? userData.name.charAt(0).toUpperCase() : "U"}</div>
+          <a href="profile.html?uid=${receiverUid}" class="font-semibold hover:underline">${userData.name || "Người dùng"}${userData.isVerified ? '<span class="verified-badge">✔</span>' : ""}</a>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="window.location.href='profile.html?uid=${receiverUid}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
+          <button onclick="window.cancelSentFriendRequest('${requestId}', '${receiverUid}')" class="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700">Hủy</button>
+        </div>
+      `;
+      sentRequestsList.appendChild(div);
+    }
+  }, (error) => {
+    showToast(`Lỗi khi tải lời mời đã gửi: ${error.message}`);
+  });
+}
+
+// Define functions in global scope
+window.addFriendSuggestion = async function(friendUid) {
+  if (!auth.currentUser) {
+    showToast("Vui lòng đăng nhập để kết bạn!");
+    return;
+  }
+  if (friendUid === auth.currentUser.uid) {
+    showToast("Bạn không thể thêm chính mình!");
+    return;
+  }
+  try {
+    const userSnap = await getDoc(doc(db, "users", auth.currentUser.uid));
+    const userData = userSnap.data() || {};
+    await addDoc(collection(db, "friend_requests", friendUid, "requests"), {
+      senderUid: auth.currentUser.uid,
+      senderName: userData.name || "Người dùng",
+      createdAt: new Date()
+    });
+    showToast("Đã gửi lời mời kết bạn!");
+  } catch (error) {
+    showToast(`Lỗi khi gửi lời mời: ${error.message}`);
+  }
+};
+
+window.acceptFriendRequest = async function(requestId, senderUid, receiverUid) {
+  try {
+    await setDoc(doc(db, "friends", receiverUid, "list", senderUid), { added: true });
+    await setDoc(doc(db, "friends", senderUid, "list", receiverUid), { added: true });
+    await deleteDoc(doc(db, "friend_requests", receiverUid, "requests", requestId));
+    showToast("Đã chấp nhận lời mời kết bạn!");
+  } catch (error) {
+    showToast(`Lỗi khi chấp nhận lời mời: ${error.message}`);
+  }
+};
+
+window.rejectFriendRequest = async function(requestId, receiverUid) {
+  try {
+    await deleteDoc(doc(db, "friend_requests", receiverUid, "requests", requestId));
+    showToast("Đã hủy lời mời kết bạn!");
+  } catch (error) {
+    showToast(`Lỗi khi hủy lời mời: ${error.message}`);
+  }
+};
+
+window.cancelSentFriendRequest = async function(requestId, receiverUid) {
+  if (!confirm("Bạn có chắc muốn hủy lời mời kết bạn này?")) return;
+  try {
+    await deleteDoc(doc(db, "friend_requests", receiverUid, "requests", requestId));
+    showToast("Đã hủy lời mời kết bạn!");
+  } catch (error) {
+    showToast(`Lỗi khi hủy lời mời: ${error.message}`);
+  }
+};
+
 document.getElementById("logout-button").addEventListener("click", async () => {
   try {
     await signOut(auth);
     window.location.href = "login.html";
   } catch (error) {
-    alert(`Lỗi khi đăng xuất: ${error.message}`);
+    showToast(`Lỗi khi đăng xuất: ${error.message}`);
   }
 });
 
 document.getElementById("add-friend-button").addEventListener("click", async () => {
   const friendEmail = document.getElementById("friend-email").value.trim();
   if (!friendEmail) {
-    alert("Vui lòng nhập email bạn bè!");
+    showToast("Vui lòng nhập email bạn bè!");
     return;
   }
 
   try {
     const usersRef = collection(db, "users");
-    const userSnap = await getDocs(usersRef);
+    const usersSnap = await getDocs(usersRef);
     let friendUid = null;
-    userSnap.forEach(doc => {
+    usersSnap.forEach(doc => {
       if (doc.data().email === friendEmail) {
         friendUid = doc.id;
       }
     });
 
     if (!friendUid) {
-      alert("Không tìm thấy người dùng với email này!");
+      showToast("Không tìm thấy người dùng với email này!");
       return;
     }
 
     if (friendUid === auth.currentUser.uid) {
-      alert("Bạn không thể thêm chính mình!");
+      showToast("Bạn không thể thêm chính mình!");
       return;
     }
 
-    await setDoc(doc(db, "friends", auth.currentUser.uid, "list", friendUid), { added: true });
+    const userSnap = await getDoc(doc(db, "users", auth.currentUser.uid));
+    const userData = userSnap.data() || {};
+    await addDoc(collection(db, "friend_requests", friendUid, "requests"), {
+      senderUid: auth.currentUser.uid,
+      senderName: userData.name || "Người dùng",
+      createdAt: new Date()
+    });
     document.getElementById("friend-email").value = "";
-    alert("Thêm bạn thành công!");
+    showToast("Đã gửi lời mời kết bạn!");
   } catch (error) {
-    alert(`Lỗi khi thêm bạn: ${error.message}`);
+    showToast(`Lỗi khi gửi lời mời: ${error.message}`);
   }
 });
 
@@ -253,22 +464,22 @@ document.getElementById("admin-add-coins").addEventListener("click", async () =>
   const email = document.getElementById("admin-email").value.trim();
   const coins = parseInt(document.getElementById("admin-coins").value);
   if (!email || isNaN(coins) || coins <= 0) {
-    alert("Vui lòng nhập email và số xu dương hợp lệ!");
+    showToast("Vui lòng nhập email và số xu dương hợp lệ!");
     return;
   }
 
   try {
     const usersRef = collection(db, "users");
-    const userSnap = await getDocs(usersRef);
+    const usersSnap = await getDocs(usersRef);
     let targetUid = null;
-    userSnap.forEach(doc => {
+    usersSnap.forEach(doc => {
       if (doc.data().email === email) {
         targetUid = doc.id;
       }
     });
 
     if (!targetUid) {
-      alert("Không tìm thấy người dùng với email này!");
+      showToast("Không tìm thấy người dùng với email này!");
       return;
     }
 
@@ -276,11 +487,11 @@ document.getElementById("admin-add-coins").addEventListener("click", async () =>
     const userDoc = await getDoc(userRef);
     const currentBalance = userDoc.data().balance || 0;
     await updateDoc(userRef, { balance: currentBalance + coins });
-    alert(`Nạp ${coins} xu cho ${email} thành công!`);
+    showToast(`Nạp ${coins} xu cho ${email} thành công!`);
     document.getElementById("admin-email").value = "";
     document.getElementById("admin-coins").value = "";
   } catch (error) {
-    alert(`Lỗi khi nạp xu: ${error.message}`);
+    showToast(`Lỗi khi nạp xu: ${error.message}`);
   }
 });
 
@@ -288,22 +499,22 @@ document.getElementById("admin-withdraw-coins").addEventListener("click", async 
   const email = document.getElementById("admin-email").value.trim();
   const coins = parseInt(document.getElementById("admin-coins").value);
   if (!email || isNaN(coins) || coins <= 0) {
-    alert("Vui lòng nhập email và số xu dương hợp lệ!");
+    showToast("Vui lòng nhập email và số xu dương hợp lệ!");
     return;
   }
 
   try {
     const usersRef = collection(db, "users");
-    const userSnap = await getDocs(usersRef);
+    const usersSnap = await getDocs(usersRef);
     let targetUid = null;
-    userSnap.forEach(doc => {
+    usersSnap.forEach(doc => {
       if (doc.data().email === email) {
         targetUid = doc.id;
       }
     });
 
     if (!targetUid) {
-      alert("Không tìm thấy người dùng với email này!");
+      showToast("Không tìm thấy người dùng với email này!");
       return;
     }
 
@@ -311,78 +522,78 @@ document.getElementById("admin-withdraw-coins").addEventListener("click", async 
     const userDoc = await getDoc(userRef);
     const currentBalance = userDoc.data().balance || 0;
     if (currentBalance < coins) {
-      alert(`Số xu hiện tại (${currentBalance}) không đủ để rút ${coins} xu!`);
+      showToast(`Số xu hiện tại (${currentBalance}) không đủ để rút ${coins} xu!`);
       return;
     }
 
     await updateDoc(userRef, { balance: currentBalance - coins });
-    alert(`Rút ${coins} xu từ ${email} thành công!`);
+    showToast(`Rút ${coins} xu từ ${email} thành công!`);
     document.getElementById("admin-email").value = "";
     document.getElementById("admin-coins").value = "";
   } catch (error) {
-    alert(`Lỗi khi rút xu: ${error.message}`);
+    showToast(`Lỗi khi rút xu: ${error.message}`);
   }
 });
 
 document.getElementById("verify-button").addEventListener("click", async () => {
   const email = document.getElementById("verify-email").value.trim();
   if (!email) {
-    alert("Vui lòng nhập email người dùng!");
+    showToast("Vui lòng nhập email người dùng!");
     return;
   }
 
   try {
     const usersRef = collection(db, "users");
-    const userSnap = await getDocs(usersRef);
+    const usersSnap = await getDocs(usersRef);
     let targetUid = null;
-    userSnap.forEach(doc => {
+    usersSnap.forEach(doc => {
       if (doc.data().email === email) {
         targetUid = doc.id;
       }
     });
 
     if (!targetUid) {
-      alert("Không tìm thấy người dùng với email này!");
+      showToast("Không tìm thấy người dùng với email này!");
       return;
     }
 
     const userRef = doc(db, "users", targetUid);
     await updateDoc(userRef, { isVerified: true });
-    alert(`Cấp tích xanh cho ${email} thành công!`);
+    showToast(`Cấp tích xanh cho ${email} thành công!`);
     document.getElementById("verify-email").value = "";
   } catch (error) {
-    alert(`Lỗi khi cấp tích xanh: ${error.message}`);
+    showToast(`Lỗi khi cấp tích xanh: ${error.message}`);
   }
 });
 
 document.getElementById("unverify-button").addEventListener("click", async () => {
   const email = document.getElementById("verify-email").value.trim();
   if (!email) {
-    alert("Vui lòng nhập email người dùng!");
+    showToast("Vui lòng nhập email người dùng!");
     return;
   }
 
   try {
     const usersRef = collection(db, "users");
-    const userSnap = await getDocs(usersRef);
+    const usersSnap = await getDocs(usersRef);
     let targetUid = null;
-    userSnap.forEach(doc => {
+    usersSnap.forEach(doc => {
       if (doc.data().email === email) {
         targetUid = doc.id;
       }
     });
 
     if (!targetUid) {
-      alert("Không tìm thấy người dùng với email này!");
+      showToast("Không tìm thấy người dùng với email này!");
       return;
     }
 
     const userRef = doc(db, "users", targetUid);
     await updateDoc(userRef, { isVerified: false });
-    alert(`Hủy tích xanh cho ${email} thành công!`);
+    showToast(`Hủy tích xanh cho ${email} thành công!`);
     document.getElementById("verify-email").value = "";
   } catch (error) {
-    alert(`Lỗi khi hủy tích xanh: ${error.message}`);
+    showToast(`Lỗi khi hủy tích xanh: ${error.message}`);
   }
 });
 
@@ -395,9 +606,9 @@ document.getElementById("verify-email").addEventListener("input", async () => {
 
   try {
     const usersRef = collection(db, "users");
-    const userSnap = await getDocs(usersRef);
+    const usersSnap = await getDocs(usersRef);
     let targetUid = null;
-    userSnap.forEach(doc => {
+    usersSnap.forEach(doc => {
       if (doc.data().email === email) {
         targetUid = doc.id;
       }
@@ -440,8 +651,10 @@ onAuthStateChanged(auth, async (user) => {
     const userData = userSnap.exists() ? userSnap.data() : (await getDoc(userRef)).data();
     loadUserInfo(userData);
     loadFriends(user.uid);
+    loadFriendSuggestions(user.uid);
+    loadFriendRequests(user.uid);
+    loadSentFriendRequests(user.uid);
 
-    // Listen for real-time updates to user data
     onSnapshot(userRef, (doc) => {
       if (doc.exists()) {
         loadUserInfo(doc.data());
@@ -452,12 +665,49 @@ onAuthStateChanged(auth, async (user) => {
       document.getElementById("admin-section").classList.remove("hidden");
     }
   } catch (error) {
-    alert(`Lỗi khi tải thông tin: ${error.message}`);
+    showToast(`Lỗi khi tải thông tin: ${error.message}`);
     window.location.href = "login.html";
   }
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932e1ca1ecc2c002',t:'MTc0NTA4MzYzOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932e42e8e94f7bae',t:'MTc0NTA4NTIwNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+<script>
+(function() {
+  function c() {
+    var b = a.contentDocument || a.contentWindow.document;
+    if (b) {
+      var d = b.createElement('script');
+      d.innerHTML = "window.__CF$cv$params={r:'932e645a3d67b06f',t:'MTc0NTA4NjU3NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";
+      b.getElementsByTagName('head')[0].appendChild(d);
+    }
+  }
+  if (document.body) {
+    var a = document.createElement('iframe');
+    a.height = 1;
+    a.width = 1;
+    a.style.position = 'absolute';
+    a.style.top = 0;
+    a.style.left = 0;
+    a.style.border = 'none';
+    a.style.visibility = 'hidden';
+    document.body.appendChild(a);
+    if ('loading' !== document.readyState) {
+      c();
+    } else if (window.addEventListener) {
+      document.addEventListener('DOMContentLoaded', c);
+    } else {
+      var e = document.onreadystatechange || function() {};
+      document.onreadystatechange = function(b) {
+        e(b);
+        if ('loading' !== document.readyState) {
+          document.onreadystatechange = e;
+          c();
+        }
+      };
+    }
+  }
+})();
+</script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932ec0254c3abfa2',t:'MTc0NTA5MDMzNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932edbc00b21bfe3',t:'MTc0NTA5MTQ2Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
