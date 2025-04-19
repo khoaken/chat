@@ -275,6 +275,7 @@
       z-index: 100;
       padding: 10px;
       display: none;
+      min-width: 150px;
     }
     .dark-mode .mobile-context-menu {
       background: #2d3748;
@@ -299,9 +300,19 @@
     .dark-mode .mobile-context-menu button:hover {
       background: #4a5568;
     }
-    .profile-pic {
-      object-fit: cover;
-      border: 2px solid #4a90e2;
+    .avatar-initial {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #4a90e2;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      border: 2px solid #3578c6;
     }
     @media (max-width: 640px) {
       .chat-container {
@@ -349,7 +360,7 @@
   <div class="chat-container">
     <div class="chat-header">
       <div class="flex items-center gap-3">
-        <img id="friend-pic" src="https://via.placeholder.com/40" alt="Friend Avatar" class="w-10 h-10 rounded-full profile-pic">
+        <div id="friend-pic" class="avatar-initial"></div>
         <h2 id="friend-name" class="text-lg font-semibold"></h2>
       </div>
       <button id="back-button" class="bg-transparent text-white text-xl border-none">←</button>
@@ -418,48 +429,63 @@
     }
 
     async function loadFriendInfo(friendId) {
-      const friendRef = doc(db, "users", friendId);
-      const friendSnap = await getDoc(friendRef);
-      if (friendSnap.exists()) {
-        const friendData = friendSnap.data();
-        document.getElementById("friend-name").innerText = friendData.name || "Người dùng";
-        document.getElementById("friend-name").innerHTML += friendData.isVerified ? " ✅" : "";
-        document.getElementById("friend-pic").src = friendData.profilePic || "https://via.placeholder.com/40";
+      try {
+        const friendRef = doc(db, "users", friendId);
+        const friendSnap = await getDoc(friendRef);
+        if (friendSnap.exists()) {
+          const friendData = friendSnap.data();
+          document.getElementById("friend-name").innerText = friendData.name || "Người dùng";
+          document.getElementById("friend-name").innerHTML += friendData.isVerified ? " ✅" : "";
+          const friendPic = document.getElementById("friend-pic");
+          friendPic.innerText = friendData.name ? friendData.name.charAt(0).toUpperCase() : "U";
+        } else {
+          showToast("Không tìm thấy thông tin bạn bè.");
+        }
+      } catch (error) {
+        showToast(`Lỗi khi tải thông tin bạn bè: ${error.message}`);
       }
     }
 
     async function loadPinnedMessage(chatId, userId) {
-      const chatRef = doc(db, "chats", chatId);
-      const chatSnap = await getDoc(chatRef);
-      const pinnedMessageId = chatSnap.data()?.pinnedMessageId;
-      const pinnedMessageDiv = document.getElementById("pinned-message");
-      if (pinnedMessageId) {
-        const msgRef = doc(db, "chats", chatId, "messages", pinnedMessageId);
-        const msgSnap = await getDoc(msgRef);
-        if (msgSnap.exists()) {
-          const msg = msgSnap.data();
-          pinnedMessageDiv.className = "pinned-message";
-          let content = `<div class="message-content">${msg.text || ""}`;
-          if (msg.imageUrl) {
-            content += `<img src="${msg.imageUrl}" alt="Pinned image">`;
-          }
-          content += `</div>`;
-          content += `<button class="unpin-button" data-msg-id="${msgSnap.id}">Bỏ ghim</button>`;
-          pinnedMessageDiv.innerHTML = content;
-          pinnedMessageDiv.classList.remove("hidden");
+      try {
+        const chatRef = doc(db, "chats", chatId);
+        const chatSnap = await getDoc(chatRef);
+        const pinnedMessageId = chatSnap.data()?.pinnedMessageId;
+        const pinnedMessageDiv = document.getElementById("pinned-message");
+        if (pinnedMessageId) {
+          const msgRef = doc(db, "chats", chatId, "messages", pinnedMessageId);
+          const msgSnap = await getDoc(msgRef);
+          if (msgSnap.exists()) {
+            const msg = msgSnap.data();
+            pinnedMessageDiv.className = "pinned-message";
+            let content = `<div class="message-content">${msg.text || ""}`;
+            if (msg.imageUrl) {
+              content += `<img src="${msg.imageUrl}" alt="Pinned image">`;
+            }
+            content += `</div>`;
+            content += `<button class="unpin-button" data-msg-id="${msgSnap.id}">Bỏ ghim</button>`;
+            pinnedMessageDiv.innerHTML = content;
+            pinnedMessageDiv.classList.remove("hidden");
 
-          pinnedMessageDiv.querySelector(".unpin-button").addEventListener("click", async () => {
-            await updateDoc(chatRef, { pinnedMessageId: null });
+            pinnedMessageDiv.querySelector(".unpin-button").addEventListener("click", async () => {
+              await updateDoc(chatRef, { pinnedMessageId: null });
+              pinnedMessageDiv.classList.add("hidden");
+              pinnedMessageDiv.innerHTML = "";
+              showToast("Đã bỏ ghim tin nhắn.");
+            });
+          } else {
             pinnedMessageDiv.classList.add("hidden");
-            pinnedMessageDiv.innerHTML = "";
-          });
+          }
+        } else {
+          pinnedMessageDiv.classList.add("hidden");
         }
-      } else {
-        pinnedMessageDiv.classList.add("hidden");
+      } catch (error) {
+        showToast(`Lỗi khi tải tin nhắn ghim: ${error.message}`);
       }
     }
 
     function showMobileContextMenu(event, msgId, isSent, chatId, userId) {
+      event.preventDefault();
       const contextMenu = document.getElementById("mobile-context-menu");
       contextMenu.innerHTML = `
         ${isSent ? `
@@ -468,14 +494,21 @@
         ` : ''}
       `;
       contextMenu.style.display = "block";
-      contextMenu.style.top = `${event.clientY}px`;
-      contextMenu.style.left = `${event.clientX}px`;
+      const touchX = event.changedTouches[0].clientX;
+      const touchY = event.changedTouches[0].clientY;
+      const menuWidth = contextMenu.offsetWidth;
+      const menuHeight = contextMenu.offsetHeight;
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+      contextMenu.style.left = Math.min(touchX, windowWidth - menuWidth - 10) + "px";
+      contextMenu.style.top = Math.min(touchY, windowHeight - menuHeight - 10) + "px";
 
       if (isSent) {
         contextMenu.querySelector(".pin-button").addEventListener("click", async () => {
           await updateDoc(doc(db, "chats", chatId), { pinnedMessageId: msgId });
           loadPinnedMessage(chatId, userId);
           contextMenu.style.display = "none";
+          showToast("Đã ghim tin nhắn.");
         });
         contextMenu.querySelector(".recall-button").addEventListener("click", async () => {
           await deleteDoc(doc(db, "chats", chatId, "messages", msgId));
@@ -485,126 +518,136 @@
             await updateDoc(chatRef, { pinnedMessageId: null });
           }
           contextMenu.style.display = "none";
+          showToast("Đã thu hồi tin nhắn.");
         });
       }
 
-      // Hide context menu when clicking outside
       document.addEventListener("click", function hideContextMenu(e) {
         if (!contextMenu.contains(e.target)) {
           contextMenu.style.display = "none";
           document.removeEventListener("click", hideContextMenu);
         }
-      });
+      }, { once: true });
     }
 
-    function loadMessages(userId, friendId) {
-      const chatId = getChatId(userId, friendId);
-      const messagesRef = collection(db, "chats", chatId, "messages");
-      const q = query(messagesRef, orderBy("timestamp", "asc"));
-      let messages = [];
-      onSnapshot(q, (snapshot) => {
-        messages = [];
-        snapshot.forEach((doc) => {
-          messages.push({ id: doc.id, ...doc.data() });
-        });
-
+    async function loadMessages(userId, friendId) {
+      try {
+        const chatId = getChatId(userId, friendId);
+        const messagesRef = collection(db, "chats", chatId, "messages");
+        const q = query(messagesRef, orderBy("timestamp", "asc"));
         const messagesDiv = document.getElementById("messages");
-        messagesDiv.innerHTML = "";
-        lastMessageDate = null;
-        lastSenderId = null;
+        onSnapshot(q, (snapshot) => {
+          messagesDiv.innerHTML = "";
+          let messages = [];
+          snapshot.forEach((doc) => {
+            messages.push({ id: doc.id, ...doc.data() });
+          });
 
-        const lastSentMessage = messages
-          .filter(msg => msg.senderId === userId)
-          .slice(-1)[0];
+          lastMessageDate = null;
+          lastSenderId = null;
 
-        messages.forEach((msg) => {
-          const msgDate = msg.timestamp ? formatDate(msg.timestamp) : '';
-          if (msgDate && msgDate !== lastMessageDate) {
-            lastMessageDate = msgDate;
-            const divider = document.createElement("div");
-            divider.className = "date-divider";
-            divider.innerText = msgDate;
-            messagesDiv.appendChild(divider);
-          }
-          const messageDiv = document.createElement("div");
-          const isSameSender = lastSenderId === msg.senderId;
-          lastSenderId = msg.senderId;
-          messageDiv.className = `message ${msg.senderId === userId ? "sent" : "received"} ${isSameSender ? "no-time" : ""}`;
-          messageDiv.dataset.msgId = msg.id;
-          let content = `<div>${msg.text || ""}</div>`;
-          if (msg.imageUrl) {
-            content += `<img src="${msg.imageUrl}" alt="Attached image">`;
-          }
-          content += `<div class="message-time">${formatTime(msg.timestamp)}</div>`;
-          if (msg.senderId === userId && msg.id === lastSentMessage?.id && msg.readBy?.includes(friendId)) {
-            content += `<div class="read-receipt">Đã đọc ✅</div>`;
-          }
-          if (msg.senderId === userId) {
-            content += `
-              <div class="message-actions-container">
-                <div class="message-actions">
-                  <button class="pin-button" data-msg-id="${msg.id}">Ghim tin nhắn</button>
-                  <button class="recall-button" data-msg-id="${msg.id}">Thu hồi tin nhắn</button>
+          const lastSentMessage = messages
+            .filter(msg => msg.senderId === userId)
+            .slice(-1)[0];
+
+          messages.forEach((msg) => {
+            const msgDate = msg.timestamp ? formatDate(msg.timestamp) : '';
+            if (msgDate && msgDate !== lastMessageDate) {
+              lastMessageDate = msgDate;
+              const divider = document.createElement("div");
+              divider.className = "date-divider";
+              divider.innerText = msgDate;
+              messagesDiv.appendChild(divider);
+            }
+            const messageDiv = document.createElement("div");
+            const isSameSender = lastSenderId === msg.senderId;
+            lastSenderId = msg.senderId;
+            messageDiv.className = `message ${msg.senderId === userId ? "sent" : "received"} ${isSameSender ? "no-time" : ""}`;
+            messageDiv.dataset.msgId = msg.id;
+            let content = `<div>${msg.text || ""}</div>`;
+            if (msg.imageUrl) {
+              content += `<img src="${msg.imageUrl}" alt="Attached image">`;
+            }
+            content += `<div class="message-time">${formatTime(msg.timestamp)}</div>`;
+            if (msg.senderId === userId && msg.id === lastSentMessage?.id && msg.readBy?.includes(friendId)) {
+              content += `<div class="read-receipt">Đã đọc ✅</div>`;
+            }
+            if (msg.senderId === userId) {
+              content += `
+                <div class="message-actions-container">
+                  <div class="message-actions">
+                    <button class="pin-button" data-msg-id="${msg.id}">Ghim tin nhắn</button>
+                    <button class="recall-button" data-msg-id="${msg.id}">Thu hồi tin nhắn</button>
+                  </div>
                 </div>
-              </div>
-            `;
-          }
-          messageDiv.innerHTML = content;
-          messagesDiv.appendChild(messageDiv);
+              `;
+            }
+            messageDiv.innerHTML = content;
+            messagesDiv.appendChild(messageDiv);
 
-          // PC interactions
-          if (msg.senderId === userId) {
-            messageDiv.querySelector(".pin-button")?.addEventListener("click", async () => {
-              await updateDoc(doc(db, "chats", chatId), { pinnedMessageId: msg.id });
-              loadPinnedMessage(chatId, userId);
-            });
-            messageDiv.querySelector(".recall-button")?.addEventListener("click", async () => {
-              await deleteDoc(doc(db, "chats", chatId, "messages", msg.id));
-              const chatRef = doc(db, "chats", chatId);
-              const chatSnap = await getDoc(chatRef);
-              if (chatSnap.data()?.pinnedMessageId === msg.id) {
-                await updateDoc(chatRef, { pinnedMessageId: null });
-              }
-            });
-          }
+            if (msg.senderId === userId) {
+              messageDiv.querySelector(".pin-button")?.addEventListener("click", async () => {
+                await updateDoc(doc(db, "chats", chatId), { pinnedMessageId: msg.id });
+                loadPinnedMessage(chatId, userId);
+                showToast("Đã ghim tin nhắn.");
+              });
+              messageDiv.querySelector(".recall-button")?.addEventListener("click", async () => {
+                await deleteDoc(doc(db, "chats", chatId, "messages", msg.id));
+                const chatRef = doc(db, "chats", chatId);
+                const chatSnap = await getDoc(chatRef);
+                if (chatSnap.data()?.pinnedMessageId === msg.id) {
+                  await updateDoc(chatRef, { pinnedMessageId: null });
+                }
+                showToast("Đã thu hồi tin nhắn.");
+              });
+            }
 
-          // Mobile long press
-          let touchTimeout;
-          messageDiv.addEventListener("touchstart", (e) => {
-            touchTimeout = setTimeout(() => {
-              e.preventDefault();
-              showMobileContextMenu(e, msg.id, msg.senderId === userId, chatId, userId);
-            }, 500);
-          });
-          messageDiv.addEventListener("touchend", () => {
-            clearTimeout(touchTimeout);
-          });
-          messageDiv.addEventListener("touchmove", () => {
-            clearTimeout(touchTimeout);
-          });
-
-          if (msg.senderId !== userId && !msg.readBy?.includes(userId)) {
-            updateDoc(doc(db, "chats", chatId, "messages", msg.id), {
-              readBy: arrayUnion(userId)
+            let touchTimeout;
+            messageDiv.addEventListener("touchstart", (e) => {
+              touchTimeout = setTimeout(() => {
+                if (msg.senderId === userId) {
+                  showMobileContextMenu(e, msg.id, true, chatId, userId);
+                }
+              }, 500);
             });
-          }
+            messageDiv.addEventListener("touchend", () => {
+              clearTimeout(touchTimeout);
+            });
+            messageDiv.addEventListener("touchmove", () => {
+              clearTimeout(touchTimeout);
+            });
+
+            if (msg.senderId !== userId && !msg.readBy?.includes(userId)) {
+              updateDoc(doc(db, "chats", chatId, "messages", msg.id), {
+                readBy: arrayUnion(userId)
+              });
+            }
+          });
+          messagesDiv.scrollTop = messagesDiv.scrollHeight;
+          loadPinnedMessage(chatId, userId);
+        }, (error) => {
+          showToast(`Lỗi khi tải tin nhắn: ${error.message}`);
         });
-        messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        loadPinnedMessage(chatId, userId);
-      });
+      } catch (error) {
+        showToast(`Lỗi khi tải tin nhắn: ${error.message}`);
+      }
     }
 
     function setupTypingIndicator(userId, friendId) {
-      const chatId = getChatId(userId, friendId);
-      const typingRef = doc(db, "chats", chatId, "typing", friendId);
-      onSnapshot(typingRef, (doc) => {
-        const typingIndicator = document.getElementById("typing-indicator");
-        if (doc.exists() && doc.data().isTyping) {
-          typingIndicator.style.display = "block";
-        } else {
-          typingIndicator.style.display = "none";
-        }
-      });
+      try {
+        const chatId = getChatId(userId, friendId);
+        const typingRef = doc(db, "chats", chatId, "typing", friendId);
+        onSnapshot(typingRef, (doc) => {
+          const typingIndicator = document.getElementById("typing-indicator");
+          if (doc.exists() && doc.data().isTyping) {
+            typingIndicator.style.display = "block";
+          } else {
+            typingIndicator.style.display = "none";
+          }
+        });
+      } catch (error) {
+        showToast(`Lỗi khi thiết lập chỉ báo gõ: ${error.message}`);
+      }
     }
 
     document.getElementById("send-button").addEventListener("click", async () => {
@@ -674,10 +717,14 @@
       const userId = auth.currentUser.uid;
       const chatId = getChatId(userId, friendId);
       const typingRef = doc(db, "chats", chatId, "typing", userId);
-      await setDoc(typingRef, { isTyping: true });
-      setTimeout(async () => {
-        await setDoc(typingRef, { isTyping: false });
-      }, 3000);
+      try {
+        await setDoc(typingRef, { isTyping: true });
+        setTimeout(async () => {
+          await setDoc(typingRef, { isTyping: false });
+        }, 3000);
+      } catch (error) {
+        showToast(`Lỗi khi cập nhật trạng thái gõ: ${error.message}`);
+      }
     });
 
     document.getElementById("emoji-button").addEventListener("click", () => {
@@ -696,40 +743,27 @@
       window.location.href = "index.html";
     });
 
-    if (localStorage.getItem("theme") === "dark") {
-      document.body.classList.add("dark-mode");
-    }
-
     onAuthStateChanged(auth, async (user) => {
       if (!user) {
         window.location.href = "login.html";
         return;
       }
-
       const urlParams = new URLSearchParams(window.location.search);
       const friendId = urlParams.get("uid");
       if (!friendId) {
-        showToast("Không tìm thấy người dùng để trò chuyện!");
+        showToast("Không tìm thấy người nhận.");
         window.location.href = "index.html";
         return;
       }
-
       try {
         await loadFriendInfo(friendId);
-        loadMessages(user.uid, friendId);
+        await loadMessages(user.uid, friendId);
         setupTypingIndicator(user.uid, friendId);
-        const chatId = getChatId(user.uid, friendId);
-        const chatRef = doc(db, "chats", chatId);
-        const chatSnap = await getDoc(chatRef);
-        if (!chatSnap.exists()) {
-          await setDoc(chatRef, { pinnedMessageId: null });
-        }
       } catch (error) {
-        showToast(`Lỗi khi tải cuộc trò chuyện: ${error.message}`);
+        showToast(`Lỗi khi khởi tạo chat: ${error.message}`);
         window.location.href = "index.html";
       }
     });
   </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932d3ace3b08b0bb',t:'MTc0NTA3NDM4OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
