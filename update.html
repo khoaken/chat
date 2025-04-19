@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cập nhật thông tin - KKChat</title>
+  <meta name="apple-Mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="ChatUp" />
+  <meta name="theme-color" content="#4a90e2" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Montserrat', sans-serif; }
+    .dark-mode { background: #1a202c; color: #e2e8f0; }
+    .dark-mode .bg-white { background: #2d3748; }
+    .dark-mode .bg-gray-100 { background: #1a202c; }
+    .dark-mode .border-gray-200 { border-color: #4a5568; }
+    .dark-mode input, .dark-mode button { background: #4a5568; color: #e2e8f0; border-color: #718096; }
+    .avatar-initial {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #4a90e2;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      border: 2px solid #3578c6;
+    }
+    .avatar-initial-large {
+      width: 100px;
+      height: 100px;
+      font-size: 2.5rem;
+    }
+    .verified-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: linear-gradient(45deg, #00f, #0ff);
+      color: white;
+      font-size: 0.9rem;
+      margin-left: 5px;
+      position: relative;
+      transition: transform 0.2s ease;
+    }
+    .verified-badge:hover {
+      transform: scale(1.1);
+    }
+    .verified-badge:hover::after {
+      content: 'Đây là người nổi tiếng';
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2d3748;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      z-index: 10;
+    }
+    .dark-mode .verified-badge:hover::after {
+      background: #e2e8f0;
+      color: #1a202c;
+    }
+    @media (max-width: 640px) {
+      .verified-badge { width: 18px; height: 18px; font-size: 0.8rem; }
+      .verified-badge:hover::after { font-size: 0.7rem; top: -25px; }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+  <div class="max-w-4xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-3xl font-semibold text-blue-600">Cập nhật thông tin</h1>
+      <div class="flex items-center gap-4">
+        <button id="dark-toggle" class="text-xl bg-transparent border-none">🌙</button>
+        <button onclick="window.location.href='index.html'" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Quay lại</button>
+      </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <h2 class="text-xl font-semibold mb-4">Thông tin hiện tại</h2>
+      <div class="flex items-center gap-6 mb-4">
+        <div id="user-pic" class="avatar-initial avatar-initial-large"></div>
+        <div>
+          <h3 id="user-name" class="text-lg font-semibold"></h3>
+          <p id="user-email" class="text-gray-600"></p>
+          <p id="user-dob" class="text-gray-600"></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <h2 class="text-xl font-semibold mb-4">Cập nhật thông tin</h2>
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">Tên hiển thị</label>
+        <input id="update-name" type="text" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Nhập tên mới">
+        <button id="update-name-button" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Cập nhật tên</button>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">Mật khẩu mới</label>
+        <input id="update-password" type="password" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Nhập mật khẩu mới">
+        <button id="update-password-button" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Cập nhật mật khẩu</button>
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">Ngày sinh</label>
+        <input id="update-dob" type="date" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
+        <button id="update-dob-button" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Cập nhật ngày sinh</button>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, updateProfile, updatePassword } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
+  authDomain: "chatup-7fed7.firebaseapp.com",
+  projectId: "chatup-7fed7",
+  storageBucket: "chatup-7fed7.appspot.com",
+  messagingSenderId: "287838782402",
+  appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+function loadUserInfo(user, userData) {
+  const userName = document.getElementById("user-name");
+  userName.innerText = userData.name || "Người dùng";
+  if (userData.isVerified) {
+    userName.innerHTML += `<span class="verified-badge">✔</span>`;
+  }
+  document.getElementById("user-email").innerText = `Email: ${user.email || "Không có"}`;
+  document.getElementById("user-dob").innerText = `Ngày sinh: ${userData.dob || "Chưa thiết lập"}`;
+  const userPic = document.getElementById("user-pic");
+  userPic.innerText = userData.name ? userData.name.charAt(0).toUpperCase() : "U";
+}
+
+document.getElementById("update-name-button").addEventListener("click", async () => {
+  const newName = document.getElementById("update-name").value.trim();
+  if (!newName) {
+    alert("Vui lòng nhập tên mới!");
+    return;
+  }
+
+  try {
+    const user = auth.currentUser;
+    const userRef = doc(db, "users", user.uid);
+    await updateProfile(user, { displayName: newName });
+    await updateDoc(userRef, { name: newName });
+    alert("Cập nhật tên thành công!");
+    document.getElementById("update-name").value = "";
+  } catch (error) {
+    alert(`Lỗi khi cập nhật tên: ${error.message}`);
+  }
+});
+
+document.getElementById("update-password-button").addEventListener("click", async () => {
+  const newPassword = document.getElementById("update-password").value.trim();
+  if (!newPassword || newPassword.length < 6) {
+    alert("Mật khẩu phải có ít nhất 6 ký tự!");
+    return;
+  }
+
+  try {
+    const user = auth.currentUser;
+    await updatePassword(user, newPassword);
+    alert("Cập nhật mật khẩu thành công!");
+    document.getElementById("update-password").value = "";
+  } catch (error) {
+    alert(`Lỗi khi cập nhật mật khẩu: ${error.message}`);
+  }
+});
+
+document.getElementById("update-dob-button").addEventListener("click", async () => {
+  const newDob = document.getElementById("update-dob").value;
+  if (!newDob) {
+    alert("Vui lòng chọn ngày sinh!");
+    return;
+  }
+
+  try {
+    const user = auth.currentUser;
+    const userRef = doc(db, "users", user.uid);
+    await updateDoc(userRef, { dob: newDob });
+    alert("Cập nhật ngày sinh thành công!");
+    document.getElementById("update-dob").value = "";
+  } catch (error) {
+    alert(`Lỗi khi cập nhật ngày sinh: ${error.message}`);
+  }
+});
+
+document.getElementById("dark-toggle").addEventListener("click", () => {
+  document.body.classList.toggle("dark-mode");
+  localStorage.setItem("theme", document.body.classList.contains("dark-mode") ? "dark" : "light");
+});
+
+if (localStorage.getItem("theme") === "dark") document.body.classList.add("dark-mode");
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    window.location.href = "login.html";
+    return;
+  }
+
+  try {
+    const userRef = doc(db, "users", user.uid);
+    const userSnap = await getDoc(userRef);
+    const userData = userSnap.exists() ? userSnap.data() : {};
+    loadUserInfo(user, userData);
+  } catch (error) {
+    alert(`Lỗi khi tải thông tin: ${error.message}`);
+    window.location.href = "login.html";
+  }
+});
+</script>
+</body>
+</html>
