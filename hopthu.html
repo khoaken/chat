@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>KKChat - Hộp thư</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="ChatUp" />
+  <meta name="theme-color" content="#4a90e2" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+      padding-left: calc(20px + env(safe-area-inset-left));
+      padding-right: calc(20px + env(safe-area-inset-right));
+      padding-bottom: calc(20px + env(safe-area-inset-bottom));
+    }
+    .dark-mode {
+      background: #1a202c;
+      color: #e2e8f0;
+    }
+    .dark-mode .bg-white {
+      background: #2d3748;
+    }
+    .dark-mode .border-gray-200 {
+      border-color: #4a5568;
+    }
+    .inbox-container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    .inbox-item {
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .inbox-item:hover {
+      transform: translateY(-2px);
+    }
+    .avatar-initial {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: #4a90e2;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 1.5rem;
+      text-transform: uppercase;
+      border: 2px solid #3578c6;
+    }
+    .verified-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: linear-gradient(45deg, #00f, #0ff);
+      color: white;
+      font-size: 0.9rem;
+      margin-left: 5px;
+      position: relative;
+      transition: transform 0.2s ease;
+    }
+    .verified-badge:hover {
+      transform: scale(1.1);
+    }
+    .verified-badge:hover::after {
+      content: 'Đây là người nổi tiếng';
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2d3748;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      z-index: 10;
+    }
+    .dark-mode .verified-badge:hover::after {
+      background: #e2e8f0;
+      color: #1a202c;
+    }
+    .last-message {
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .loading {
+      text-align: center;
+      color: #718096;
+      padding: 20px;
+    }
+    .empty {
+      text-align: center;
+      color: #718096;
+      padding: 20px;
+    }
+    #inbox-list, #pending-list {
+      min-height: 100px;
+    }
+    .unread-count {
+      background: #e53e3e;
+      color: white;
+      border-radius: 9999px;
+      padding: 2px 8px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .pending-item {
+      background: #fefcbf;
+      padding: 10px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    @media (max-width: 640px) {
+      body {
+        padding: 10px;
+        padding-left: calc(10px + env(safe-area-inset-left));
+        padding-right: calc(10px + env(safe-area-inset-right));
+        padding-bottom: calc(10px + env(safe-area-inset-bottom));
+      }
+      .avatar-initial {
+        width: 40px;
+        height: 40px;
+        font-size: 1.2rem;
+      }
+      .verified-badge {
+        width: 18px;
+        height: 18px;
+        font-size: 0.8rem;
+      }
+      .verified-badge:hover::after {
+        font-size: 0.7rem;
+        top: -25px;
+      }
+      .unread-count {
+        padding: 1px 6px;
+        font-size: 0.7rem;
+      }
+    }
+  </style>
+</head>
+<body class="bg-gray-100">
+  <div class="inbox-container">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-3xl font-semibold text-blue-600">Hộp thư</h1>
+      <div class="flex items-center gap-4">
+        <button id="dark-toggle" class="text-xl bg-transparent border-none">🌙</button>
+        <button onclick="window.location.href='index.html'" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Quay lại</button>
+      </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <h2 class="text-xl font-semibold mb-4">Tin nhắn đang chờ</h2>
+      <div id="pending-list" class="loading">Đang tải...</div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md">
+      <h2 class="text-xl font-semibold mb-4">Cuộc trò chuyện</h2>
+      <div id="inbox-list" class="loading">Đang tải...</div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+    import { getFirestore, collection, doc, getDoc, getDocs, onSnapshot, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
+      authDomain: "chatup-7fed7.firebaseapp.com",
+      projectId: "chatup-7fed7",
+      storageBucket: "chatup-7fed7.appspot.com",
+      messagingSenderId: "287838782402",
+      appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    function getChatId(userId1, userId2) {
+      return [userId1, userId2].sort().join('_');
+    }
+
+    function formatTime(timestamp) {
+      if (!timestamp) return '';
+      const date = timestamp.toDate();
+      const now = new Date();
+      const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+      if (diffDays === 0) {
+        return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      } else if (diffDays === 1) {
+        return 'Hôm qua';
+      } else {
+        return date.toLocaleDateString('vi-VN', { day: 'numeric', month: 'numeric' });
+      }
+    }
+
+    async function loadPendingMessages(userId) {
+      const pendingList = document.getElementById("pending-list");
+      if (!pendingList) {
+        console.error("Pending list element not found");
+        return;
+      }
+
+      try {
+        console.log(`Loading pending messages for user: ${userId}`);
+        const pendingMessages = [];
+        const chatsRef = collection(db, "chats");
+        const chatsSnap = await getDocs(chatsRef);
+
+        console.log(`Found ${chatsSnap.size} chats for pending messages`);
+        for (const chatDoc of chatsSnap.docs) {
+          const chatId = chatDoc.id;
+          console.log(`Checking pending messages for chatId: ${chatId}`);
+          if (chatId.includes(userId)) {
+            const otherUserId = chatId.split('_').find(id => id !== userId);
+            if (otherUserId) {
+              console.log(`Found other user: ${otherUserId} for chat ${chatId}`);
+              const userRef = doc(db, "users", otherUserId);
+              const userSnap = await getDoc(userRef);
+              const userData = userSnap.exists() ? userSnap.data() : { name: 'Người dùng', isVerified: false };
+              console.log(`User data for ${otherUserId}:`, userData);
+              const messagesRef = collection(db, "chats", chatId, "messages");
+              const q = query(messagesRef, orderBy("timestamp", "desc"), limit(10)); // Giới hạn 10 tin nhắn gần đây
+              const messagesSnap = await getDocs(q);
+              console.log(`Found ${messagesSnap.size} messages in chat ${chatId}`);
+              messagesSnap.forEach(msgDoc => {
+                const msg = msgDoc.data();
+                console.log(`Checking message ${msgDoc.id}:`, msg);
+                if (msg.senderId !== userId && msg.readBy && !msg.readBy.includes(userId)) {
+                  console.log(`Unread message found from ${msg.senderId} in chat ${chatId}`);
+                  pendingMessages.push({
+                    chatId,
+                    otherUserId,
+                    name: userData.name || 'Người dùng',
+                    isVerified: userData.isVerified || false,
+                    message: msg.text || (msg.imageUrl ? 'Đã gửi một hình ảnh' : ''),
+                    timestamp: msg.timestamp
+                  });
+                } else {
+                  console.log(`Message ${msgDoc.id} is read or sent by user`);
+                }
+              });
+            } else {
+              console.log(`No valid otherUserId found for chat ${chatId}`);
+            }
+          }
+        }
+
+        pendingList.innerHTML = '';
+        if (pendingMessages.length === 0) {
+          pendingList.innerHTML = '<div class="empty">Không có tin nhắn đang chờ.</div>';
+          console.log("No pending messages to display");
+          return;
+        }
+
+        console.log(`Rendering ${pendingMessages.length} pending messages`);
+        pendingMessages.forEach(msg => {
+          const div = document.createElement("div");
+          div.className = "pending-item";
+          div.addEventListener("click", () => {
+            window.location.href = `chat.html?uid=${msg.otherUserId}`;
+          });
+          div.innerHTML = `
+            <div class="avatar-initial">${msg.name.charAt(0).toUpperCase()}</div>
+            <div class="flex-1">
+              <div class="flex items-center">
+                <span class="font-semibold">${msg.name}${msg.isVerified ? '<span class="verified-badge">✔</span>' : ''}</span>
+              </div>
+              <p class="last-message text-gray-600 text-sm">${msg.message}</p>
+            </div>
+            <div class="text-gray-500 text-sm">${msg.timestamp ? formatTime(msg.timestamp) : ''}</div>
+          `;
+          pendingList.appendChild(div);
+        });
+      } catch (error) {
+        console.error("Error loading pending messages:", error, error.code, error.message);
+        pendingList.innerHTML = '<div class="empty">Lỗi khi tải tin nhắn đang chờ: ' + (error.message || 'Không xác định') + '. Vui lòng thử lại.</div>';
+      }
+    }
+
+    async function loadInbox(userId) {
+      const inboxList = document.getElementById("inbox-list");
+      if (!inboxList) {
+        console.error("Inbox list element not found");
+        return;
+      }
+
+      try {
+        console.log(`Loading inbox for user: ${userId}`);
+        const conversations = [];
+        const chatsRef = collection(db, "chats");
+        const chatsSnap = await getDocs(chatsRef);
+
+        console.log(`Found ${chatsSnap.size} chats for user ${userId}`);
+        for (const chatDoc of chatsSnap.docs) {
+          const chatId = chatDoc.id;
+          console.log(`Checking chatId: ${chatId}`);
+          if (chatId.includes(userId)) {
+            const otherUserId = chatId.split('_').find(id => id !== userId);
+            if (otherUserId) {
+              console.log(`Found other user: ${otherUserId}`);
+              const userRef = doc(db, "users", otherUserId);
+              const userSnap = await getDoc(userRef);
+              const userData = userSnap.exists() ? userSnap.data() : { name: 'Người dùng', isVerified: false };
+              console.log(`User data for ${otherUserId}:`, userData);
+              const messagesRef = collection(db, "chats", chatId, "messages");
+              const q = query(messagesRef, orderBy("timestamp", "desc"), limit(1));
+              const messagesSnap = await getDocs(q);
+              let unreadCount = 0;
+              const unreadQuery = query(messagesRef, orderBy("timestamp", "desc"), limit(10));
+              const unreadSnap = await getDocs(unreadQuery);
+              unreadCount = unreadSnap.docs.filter(doc => {
+                const data = doc.data();
+                return data.senderId !== userId && data.readBy && !data.readBy.includes(userId);
+              }).length;
+              if (!messagesSnap.empty) {
+                const latestMsg = messagesSnap.docs[0].data();
+                console.log(`Latest message for ${chatId}:`, latestMsg);
+                conversations.push({
+                  otherUserId,
+                  name: userData.name || 'Người dùng',
+                  isVerified: userData.isVerified || false,
+                  lastMessage: latestMsg.text || (latestMsg.imageUrl ? 'Đã gửi một hình ảnh' : ''),
+                  lastMessageTime: latestMsg.timestamp,
+                  unreadCount
+                });
+              } else {
+                console.log(`No messages found for chat ${chatId}`);
+              }
+            } else {
+              console.log(`No valid otherUserId found for chat ${chatId}`);
+            }
+          }
+        }
+
+        conversations.sort((a, b) => {
+          if (!a.lastMessageTime) return 1;
+          if (!b.lastMessageTime) return -1;
+          return b.lastMessageTime.toMillis() - a.lastMessageTime.toMillis();
+        });
+
+        inboxList.innerHTML = '';
+
+        if (conversations.length === 0) {
+          inboxList.innerHTML = '<div class="empty">Chưa có ai nhắn tin với bạn.</div>';
+          console.log("No conversations to display");
+          return;
+        }
+
+        console.log(`Rendering ${conversations.length} conversations`);
+        conversations.forEach(conv => {
+          const div = document.createElement("div");
+          div.className = "inbox-item bg-gray-50 p-4 rounded-lg flex items-center gap-4 mb-2";
+          div.addEventListener("click", () => {
+            window.location.href = `chat.html?uid=${conv.otherUserId}`;
+          });
+          div.innerHTML = `
+            <div class="avatar-initial">${conv.name.charAt(0).toUpperCase()}</div>
+            <div class="flex-1">
+              <div class="flex items-center">
+                <span class="font-semibold">${conv.name}${conv.isVerified ? '<span class="verified-badge">✔</span>' : ''}</span>
+                ${conv.unreadCount > 0 ? `<span class="unread-count ml-2">${conv.unreadCount}</span>` : ''}
+              </div>
+              <p class="last-message text-gray-600 text-sm">${conv.lastMessage}</p>
+            </div>
+            <div class="text-gray-500 text-sm">${conv.lastMessageTime ? formatTime(conv.lastMessageTime) : ''}</div>
+          `;
+          inboxList.appendChild(div);
+        });
+      } catch (error) {
+        console.error("Error loading inbox:", error, error.code, error.message);
+        inboxList.innerHTML = '<div class="empty">Lỗi khi tải hộp thư: ' + (error.message || 'Không xác định') + '. Vui lòng thử lại.</div>';
+      }
+    }
+
+    document.getElementById("dark-toggle").addEventListener("click", () => {
+      document.body.classList.toggle("dark-mode");
+      localStorage.setItem("theme", document.body.classList.contains("dark-mode") ? "dark" : "light");
+    });
+
+    if (localStorage.getItem("theme") === "dark") {
+      document.body.classList.add("dark-mode");
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+      try {
+        console.log(`Initializing inbox for user: ${user.uid}`);
+        let unsubscribe = null;
+        await loadInbox(user.uid);
+        await loadPendingMessages(user.uid);
+        const chatsRef = collection(db, "chats");
+        unsubscribe = onSnapshot(chatsRef, (snapshot) => {
+          console.log("Chats collection updated, triggering reload");
+          snapshot.docChanges().forEach(change => {
+            console.log(`Change detected: ${change.type} for doc ${change.doc.id}, Data:`, change.doc.data());
+          });
+          loadInbox(user.uid);
+          loadPendingMessages(user.uid);
+        }, (error) => {
+          console.error("Snapshot error:", error, error.code, error.message);
+          document.getElementById("inbox-list").innerHTML = '<div class="empty">Lỗi kết nối thời gian thực: ' + (error.message || 'Không xác định') + '. Vui lòng thử lại.</div>';
+          document.getElementById("pending-list").innerHTML = '<div class="empty">Lỗi kết nối thời gian thực: ' + (error.message || 'Không xác định') + '. Vui lòng thử lại.</div>';
+        });
+
+        window.addEventListener('unload', () => {
+          if (unsubscribe) {
+            console.log("Unsubscribing from chats listener");
+            unsubscribe();
+          }
+        });
+      } catch (error) {
+        console.error("Error initializing inbox:", error, error.code, error.message);
+        alert(`Lỗi khi khởi tạo hộp thư: ${error.message || 'Không xác định'}`);
+        window.location.href = "index.html";
+      }
+    });
+  </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932e645a3d67b06f',t:'MTc0NTA4NjU3NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+</body>
+</html>
