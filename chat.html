@@ -3,48 +3,54 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ChatUp Updated</title>
+  <title>ChatUp Professional</title>
   <meta name="theme-color" content="#4a90e2" />
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-192.png">
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/emoji-mart@latest/css/emoji-mart.css" rel="stylesheet">
   <style>
-    body { font-family: sans-serif; margin: 0; padding: 0; background: #f2f2f2; }
-    #chat-container { display: flex; flex-direction: column; height: 100vh; }
-    #chat-header { padding: 10px; background: #4a90e2; color: white; font-size: 18px; display: flex; align-items: center; }
-    #chat-title { flex: 1; }
-    #chat-header button { margin-left: 8px; background: transparent; border: none; font-size: 20px; color: white; cursor: pointer; }
-    #chat-messages { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-    .message { max-width: 70%; padding: 8px 12px; border-radius: 12px; position: relative; word-wrap: break-word; }
-    .mine { background: #d1eaff; align-self: flex-end; border-bottom-right-radius: 0; }
-    .theirs { background: #ffffff; align-self: flex-start; border-bottom-left-radius: 0; }
-    .timestamp { font-size: 10px; color: #888; margin-top: 4px; text-align: right; }
-    #chat-input-area { display: flex; padding: 10px; background: #fff; border-top: 1px solid #ccc; align-items: center; }
-    #chat-input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
-    #send-button, #upload-button { margin-left: 10px; padding: 8px 16px; border: none; background: #4a90e2; color: white; border-radius: 6px; cursor: pointer; }
-    #file-input { display: none; }
+    .message { transition: all 0.2s ease; }
+    .message:hover { transform: translateY(-2px); }
+    .reaction { cursor: pointer; margin-right: 4px; }
+    .typing-indicator { font-size: 12px; color: #666; }
+    .dark-mode { background: #1a202c; color: #e2e8f0; }
+    .dark-mode .message.mine { background: #2d3748; color: #e2e8f0; }
+    .dark-mode .message.theirs { background: #4a5568; color: #e2e8f0; }
+    .dark-mode #chat-input-area { background: #2d3748; border-top: 1px solid #4a5568; }
+    .dark-mode #chat-input { background: #4a5568; border-color: #718096; color: #e2e8f0; }
+    .emoji-picker { position: absolute; bottom: 70px; left: 10px; }
+    .message.mine { margin-left: auto; border-bottom-right-radius: 0; }
+    .message.theirs { margin-right: auto; border-bottom-left-radius: 0; }
   </style>
 </head>
-<body>
-  <div id="chat-container">
-    <div id="chat-header">
-      <span id="chat-title">Đang chat với ...</span>
-      <button id="voice-call-button">📞</button>
-      <button id="video-call-button">🎥</button>
+<body class="bg-gray-100">
+  <div id="chat-container" class="flex flex-col h-screen">
+    <div id="chat-header" class="bg-blue-600 text-white p-4 flex items-center shadow-md">
+      <span id="chat-title" class="flex-1 text-lg font-semibold">Đang chat với ...</span>
+      <button id="voice-call-button" class="mr-2 bg-transparent border-none text-xl">📞</button>
+      <button id="video-call-button" class="mr-2 bg-transparent border-none text-xl">🎥</button>
+      <button id="dark-toggle" class="bg-transparent border-none text-xl">🌙</button>
     </div>
-    <div id="chat-messages"></div>
-    <div id="chat-input-area">
-      <input type="file" id="file-input" accept="image/*,video/*" />
-      <button id="upload-button">📎</button>
-      <input type="text" id="chat-input" placeholder="Nhập tin nhắn...">
-      <button id="send-button">Gửi</button>
+    <div id="pinned-message" class="bg-yellow-100 text-gray-800 p-2 hidden">📌 Tin nhắn ghim</div>
+    <div id="typing-status" class="typing-indicator px-4"></div>
+    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 flex flex-col gap-2"></div>
+    <div id="chat-input-area" class="flex p-4 bg-white border-t border-gray-200 items-center">
+      <input type="file" id="file-input" accept="image/*,video/*,audio/*" class="hidden" />
+      <button id="emoji-button" class="mr-2 text-xl">😊</button>
+      <button id="upload-button" class="mr-2 bg-blue-600 text-white px-3 py-1 rounded">📎</button>
+      <button id="voice-button" class="mr-2 bg-blue-600 text-white px-3 py-1 rounded">🎤</button>
+      <input type="text" id="chat-input" placeholder="Nhập tin nhắn..." class="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
+      <button id="send-button" class="ml-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Gửi</button>
     </div>
   </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, setDoc, doc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, setDoc, doc, getDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
+import { Picker } from "https://cdn.jsdelivr.net/npm/emoji-mart@latest/+esm";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
@@ -66,32 +72,63 @@ let currentUser = null;
 
 function renderMessage(msg, id) {
   const div = document.createElement('div');
-  div.className = `message ${msg.sender === currentUser.uid ? 'mine' : 'theirs'}`;
+  div.className = `message ${msg.sender === currentUser.uid ? 'mine bg-blue-100' : 'theirs bg-white'} max-w-[70%] p-3 rounded-lg shadow-sm`;
   const date = msg.createdAt.toDate();
   const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dateStr = date.toLocaleDateString();
-  div.innerHTML = `<div>${msg.text}</div><div class="timestamp">${dateStr} ${timeStr}</div>`;
+  let content = msg.text;
+  if (msg.isImage) content = `<img src="${msg.text}" style="max-width: 200px; border-radius: 8px;" />`;
+  if (msg.isVideo) content = `<video controls src="${msg.text}" style="max-width: 200px; border-radius: 8px;"></video>`;
+  if (msg.isAudio) content = `<audio controls src="${msg.text}" style="max-width: 200px;"></audio>`;
+
+  div.innerHTML = `
+    <div>${content}</div>
+    <div class="timestamp text-xs text-gray-500 mt-1 text-right">${dateStr} ${timeStr}</div>
+    <div class="reactions flex gap-1 mt-1">${renderReactions(msg.reactions || {})}</div>
+  `;
 
   if (msg.sender === currentUser.uid) {
-    // Chuột phải
     div.addEventListener('contextmenu', async (e) => {
       e.preventDefault();
       if (confirm("Thu hồi tin nhắn này?")) {
         await deleteDoc(doc(db, "chats", currentChatId, "messages", id));
       }
     });
-    // Ấn giữ mobile
     let pressTimer;
-    div.addEventListener('touchstart', (e) => {
+    div.addEventListener('touchstart', () => {
       pressTimer = setTimeout(async () => {
         if (confirm("Thu hồi tin nhắn này?")) {
           await deleteDoc(doc(db, "chats", currentChatId, "messages", id));
         }
       }, 600);
     });
-    div.addEventListener('touchend', (e) => clearTimeout(pressTimer));
+    div.addEventListener('touchend', () => clearTimeout(pressTimer));
   }
+
+  div.addEventListener('dblclick', () => {
+    const pinnedMessage = document.getElementById('pinned-message');
+    pinnedMessage.style.display = 'block';
+    pinnedMessage.innerText = '📌 ' + (msg.text.startsWith('<') ? '[Media]' : msg.text);
+  });
+
+  div.querySelectorAll('.reaction').forEach(reaction => {
+    reaction.addEventListener('click', async () => {
+      const emoji = reaction.textContent;
+      const reactions = msg.reactions || {};
+      reactions[currentUser.uid] = emoji;
+      await updateDoc(doc(db, "chats", currentChatId, "messages", id), { reactions });
+    });
+  });
+
   return div;
+}
+
+function renderReactions(reactions) {
+  const reactionCounts = {};
+  Object.values(reactions).forEach(emoji => {
+    reactionCounts[emoji] = (reactionCounts[emoji] || 0) + 1;
+  });
+  return Object.entries(reactionCounts).map(([emoji, count]) => `<span class="reaction">${emoji}${count > 1 ? count : ''}</span>`).join('');
 }
 
 function setupChat(friendId, friendName) {
@@ -110,6 +147,18 @@ function setupChat(friendId, friendName) {
     });
     chatMessages.scrollTop = chatMessages.scrollHeight;
   });
+
+  // Typing indicator
+  const typingRef = doc(db, "chats", currentChatId, "typing", currentUser.uid);
+  onSnapshot(collection(db, "chats", currentChatId, "typing"), (snapshot) => {
+    const typingUsers = [];
+    snapshot.forEach(doc => {
+      if (doc.id !== currentUser.uid && doc.data().isTyping) {
+        typingUsers.push(doc.id);
+      }
+    });
+    document.getElementById("typing-status").innerText = typingUsers.length ? `${friendName} đang nhập...` : '';
+  });
 }
 
 document.getElementById("send-button").addEventListener("click", async () => {
@@ -121,7 +170,8 @@ document.getElementById("send-button").addEventListener("click", async () => {
   await addDoc(chatRef, {
     sender: currentUser.uid,
     text,
-    createdAt: new Date()
+    createdAt: new Date(),
+    reactions: {}
   });
 
   await setDoc(doc(db, "chats", currentChatId), {
@@ -130,6 +180,7 @@ document.getElementById("send-button").addEventListener("click", async () => {
     updatedAt: new Date()
   });
 
+  await setDoc(doc(db, "chats", currentChatId, "typing", currentUser.uid), { isTyping: false });
   input.value = '';
 });
 
@@ -138,6 +189,13 @@ document.getElementById("chat-input").addEventListener("keydown", (e) => {
     e.preventDefault();
     document.getElementById("send-button").click();
   }
+});
+
+document.getElementById("chat-input").addEventListener("input", async () => {
+  await setDoc(doc(db, "chats", currentChatId, "typing", currentUser.uid), { isTyping: true });
+  setTimeout(async () => {
+    await setDoc(doc(db, "chats", currentChatId, "typing", currentUser.uid), { isTyping: false });
+  }, 2000);
 });
 
 document.getElementById("upload-button").addEventListener("click", () => {
@@ -154,18 +212,17 @@ document.getElementById("file-input").addEventListener("change", async (event) =
 
   const isImage = file.type.startsWith("image/");
   const isVideo = file.type.startsWith("video/");
-  let content = '';
-  if (isImage) {
-    content = `<img src="${fileURL}" style="max-width: 200px; border-radius: 8px;" />`;
-  } else if (isVideo) {
-    content = `<video controls src="${fileURL}" style="max-width: 200px; border-radius: 8px;"></video>`;
-  }
+  const isAudio = file.type.startsWith("audio/");
 
   const chatRef = collection(db, "chats", currentChatId, "messages");
   await addDoc(chatRef, {
     sender: currentUser.uid,
-    text: content,
-    createdAt: new Date()
+    text: fileURL,
+    isImage,
+    isVideo,
+    isAudio,
+    createdAt: new Date(),
+    reactions: {}
   });
 
   await setDoc(doc(db, "chats", currentChatId), {
@@ -235,11 +292,17 @@ async function startCall(videoEnabled) {
 }
 
 function openCallWindow(local, remote) {
-  const callWindow = window.open("", "_blank", "width=600,height=400");
+  const callWindow = window.open("", "_blank", "width=800,height=600");
   callWindow.document.write(`
-    <h2>Đang gọi...</h2>
-    <video id="localVideo" autoplay muted playsinline style="width: 45%;"></video>
-    <video id="remoteVideo" autoplay playsinline style="width: 45%;"></video>
+    <style>
+      body { margin: 0; background: #1a202c; color: white; font-family: sans-serif; }
+      video { border-radius: 8px; }
+    </style>
+    <h2 class="p-4">Đang gọi...</h2>
+    <div style="display: flex; gap: 10px; padding: 10px;">
+      <video id="localVideo" autoplay muted playsinline style="width: 48%;"></video>
+      <video id="remoteVideo" autoplay playsinline style="width: 48%;"></video>
+    </div>
   `);
   const localVideo = callWindow.document.getElementById("localVideo");
   const remoteVideo = callWindow.document.getElementById("remoteVideo");
@@ -247,12 +310,79 @@ function openCallWindow(local, remote) {
   remoteVideo.srcObject = remote;
 }
 
-document.getElementById("voice-call-button").addEventListener("click", () => {
-  startCall(false);
+document.getElementById("voice-call-button").addEventListener("click", () => startCall(false));
+document.getElementById("video-call-button").addEventListener("click", () => startCall(true));
+
+document.getElementById("dark-toggle").addEventListener("click", () => {
+  document.body.classList.toggle("dark-mode");
+  localStorage.setItem("theme", document.body.classList.contains("dark-mode") ? "dark" : "light");
 });
 
-document.getElementById("video-call-button").addEventListener("click", () => {
-  startCall(true);
+if (localStorage.getItem("theme") === "dark") document.body.classList.add("dark-mode");
+
+if ("Notification" in window && Notification.permission !== "granted") {
+  Notification.requestPermission();
+}
+
+// Emoji picker
+const emojiPicker = new Picker({
+  data: async () => (await import("https://cdn.jsdelivr.net/npm/@emoji-mart/data@latest/+esm")).default,
+  onEmojiSelect: async (emoji) => {
+    const input = document.getElementById("chat-input");
+    input.value += emoji.native;
+    input.focus();
+    await setDoc(doc(db, "chats", currentChatId, "typing", currentUser.uid), { isTyping: true });
+  }
+});
+document.getElementById("emoji-button").addEventListener("click", () => {
+  const pickerContainer = document.createElement("div");
+  pickerContainer.className = "emoji-picker";
+  pickerContainer.appendChild(emojiPicker);
+  document.getElementById("chat-input-area").appendChild(pickerContainer);
+  setTimeout(() => pickerContainer.remove(), 5000);
+});
+
+// Voice message
+document.getElementById("voice-button").addEventListener("click", async () => {
+  if (!navigator.mediaDevices || !window.MediaRecorder) return alert("Trình duyệt không hỗ trợ ghi âm.");
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const recorder = new MediaRecorder(stream);
+  const chunks = [];
+
+  recorder.ondataavailable = e => chunks.push(e.data);
+  recorder.onstop = async () => {
+    const blob = new Blob(chunks, { type: "audio/webm" });
+    const fileRef = ref(storage, `uploads/${currentChatId}/${Date.now()}_voice.webm`);
+    await uploadBytes(fileRef, blob);
+    const fileURL = await getDownloadURL(fileRef);
+
+    const chatRef = collection(db, "chats", currentChatId, "messages");
+    await addDoc(chatRef, {
+      sender: currentUser.uid,
+      text: fileURL,
+      isAudio: true,
+      createdAt: new Date(),
+      reactions: {}
+    });
+
+    await setDoc(doc(db, "chats", currentChatId), {
+      participants: [currentUser.uid, currentChatPartner],
+      lastMessage: "[Tin nhắn thoại]",
+      updatedAt: new Date()
+    });
+  };
+
+  recorder.start();
+  document.getElementById("voice-button").innerText = "⏹️";
+  setTimeout(() => {
+    recorder.stop();
+    document.getElementById("voice-button").innerText = "🎤";
+  }, 10000);
+});
+
+// New message notification
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") document.title = "ChatUp Professional";
 });
 
 onAuthStateChanged(auth, async (user) => {
@@ -267,6 +397,5 @@ onAuthStateChanged(auth, async (user) => {
   setupChat(partnerId, partnerData.name);
 });
 </script>
-
 </body>
 </html>
