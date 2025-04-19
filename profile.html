@@ -50,6 +50,85 @@
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; }
     .modal-content { background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 500px; }
     .dark-mode .modal-content { background: #2d3748; }
+    .verified-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: linear-gradient(45deg, #00f, #0ff);
+      color: white;
+      font-size: 0.9rem;
+      margin-left: 5px;
+      position: relative;
+      transition: transform 0.2s ease;
+    }
+    .verified-badge:hover {
+      transform: scale(1.1);
+    }
+    .verified-badge:hover::after {
+      content: 'Đây là người nổi tiếng';
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #2d3748;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      z-index: 10;
+    }
+    .dark-mode .verified-badge:hover::after {
+      background: #e2e8f0;
+      color: #1a202c;
+    }
+    .like-button.liked {
+      color: #e53e3e;
+      font-weight: bold;
+    }
+    .comment-section {
+      display: none;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #e2e8f0;
+    }
+    .dark-mode .comment-section {
+      border-top: 1px solid #4a5568;
+    }
+    .comment-item {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .comment-input {
+      resize: none;
+      font-size: 0.9rem;
+    }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #4a90e2;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      z-index: 100;
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+    @media (max-width: 640px) {
+      .status-text { font-size: 1rem; }
+      .avatar-initial { width: 36px; height: 36px; font-size: 1rem; }
+      .verified-badge { width: 18px; height: 18px; font-size: 0.8rem; }
+      .verified-badge:hover::after { font-size: 0.7rem; top: -25px; }
+    }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-6">
@@ -105,7 +184,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
 
 const firebaseConfig = {
@@ -126,9 +205,20 @@ let currentUser = null;
 let profileUid = null;
 let currentUserData = null;
 
+function showToast(message) {
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.innerText = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
 function loadProfile(userData, uid, isOwnProfile) {
-  document.getElementById("profile-name").innerText = userData.name || "Người dùng";
-  document.getElementById("profile-name").innerHTML += userData.isVerified ? " ✅" : "";
+  const profileName = document.getElementById("profile-name");
+  profileName.innerText = userData.name || "Người dùng";
+  if (userData.isVerified) {
+    profileName.innerHTML += `<span class="verified-badge">✔</span>`;
+  }
   const profilePic = document.getElementById("profile-pic");
   profilePic.innerText = userData.name ? userData.name.charAt(0).toUpperCase() : "U";
   document.getElementById("post-status-section").classList.toggle("hidden", !isOwnProfile);
@@ -153,7 +243,7 @@ function loadFriends(uid) {
       div.innerHTML = `
         <div class="flex items-center gap-3">
           <div class="avatar-initial">${data?.name ? data.name.charAt(0).toUpperCase() : "U"}</div>
-          <span class="font-semibold">${data?.name || "Người dùng"} ${data?.isVerified ? "✅" : ""}</span>
+          <span class="font-semibold">${data?.name || "Người dùng"}${data?.isVerified ? '<span class="verified-badge">✔</span>' : ""}</span>
         </div>
         <div class="flex gap-2">
           <button onclick="window.location.href='profile.html?uid=${friendId}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
@@ -186,28 +276,127 @@ function loadStatuses(uid, isOwnProfile) {
     snapshot.forEach(docSnap => {
       const status = docSnap.data();
       const statusId = docSnap.id;
+      const timeStr = formatTime(status.createdAt);
+      const likesCount = status.likes?.length || 0;
+      const isLiked = status.likes?.includes(currentUser?.uid) || false;
       const div = document.createElement("div");
       div.className = "status-item bg-gray-50 p-4 mb-4 shadow-sm";
-      const timeStr = formatTime(status.createdAt);
       div.innerHTML = `
         <div class="flex items-start gap-3">
           <div class="avatar-initial">${currentUserData?.name ? currentUserData.name.charAt(0).toUpperCase() : "U"}</div>
           <div class="flex-1">
-            <p class="status-text">${status.text}</p>
+            <div class="flex items-center gap-2">
+              <span class="font-semibold">${currentUserData?.name || "Người dùng"}${currentUserData?.isVerified ? '<span class="verified-badge">✔</span>' : ""}</span>
+            </div>
+            <p class="status-text mt-1">${status.text}</p>
             <p class="status-time text-gray-500 mt-1">${timeStr}${status.updatedAt ? ' (Đã chỉnh sửa)' : ''}</p>
-            ${isOwnProfile ? `
-              <div class="flex gap-2 mt-2">
-                <button onclick="editStatus('${statusId}', '${status.text.replace(/'/g, "\\'")}')" class="text-blue-600 text-sm hover:underline">Sửa</button>
-                <button onclick="deleteStatus('${statusId}')" class="text-red-600 text-sm hover:underline">Xóa</button>
-              </div>
-            ` : ''}
+            <div class="flex gap-4 mt-2">
+              <button class="like-button text-sm text-gray-600 hover:text-red-600 ${isLiked ? 'liked' : ''}" onclick="toggleLike('${statusId}', '${uid}', ${isLiked})">
+                ❤️ Thích (${likesCount})
+              </button>
+              <button class="comment-button text-sm text-gray-600 hover:text-blue-600" onclick="toggleCommentSection('comment-section-${statusId}')">
+                💬 Bình luận
+              </button>
+              ${isOwnProfile ? `
+                <div class="flex gap-2">
+                  <button onclick="editStatus('${statusId}', '${status.text.replace(/'/g, "\\'")}')" class="text-blue-600 text-sm hover:underline">Sửa</button>
+                  <button onclick="deleteStatus('${statusId}')" class="text-red-600 text-sm hover:underline">Xóa</button>
+                </div>
+              ` : ''}
+            </div>
+            <div id="comment-section-${statusId}" class="comment-section">
+              <div id="comment-list-${statusId}" class="mt-2"></div>
+              <textarea id="comment-input-${statusId}" class="w-full p-2 mt-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 comment-input" placeholder="Viết bình luận..." rows="2"></textarea>
+              <button class="mt-2 bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700" onclick="postComment('${statusId}', '${uid}')">Gửi</button>
+            </div>
           </div>
         </div>
       `;
       statusList.appendChild(div);
+      loadComments(uid, statusId);
     });
   });
 }
+
+function loadComments(uid, statusId) {
+  const commentList = document.getElementById(`comment-list-${statusId}`);
+  const commentsRef = collection(db, "users", uid, "statuses", statusId, "comments");
+  const q = query(commentsRef, orderBy("createdAt", "asc"));
+  onSnapshot(q, (snapshot) => {
+    commentList.innerHTML = "";
+    snapshot.forEach(docSnap => {
+      const comment = docSnap.data();
+      const div = document.createElement("div");
+      div.className = "comment-item";
+      div.innerHTML = `
+        <div class="avatar-initial" style="width: 32px; height: 32px; font-size: 1rem;">${comment.name ? comment.name.charAt(0).toUpperCase() : "U"}</div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-sm">${comment.name || "Người dùng"}${comment.isVerified ? '<span class="verified-badge" style="width: 16px; height: 16px; font-size: 0.7rem;">✔</span>' : ""}</span>
+          </div>
+          <p class="text-sm">${comment.text}</p>
+          <p class="text-xs text-gray-500">${formatTime(comment.createdAt)}</p>
+        </div>
+      `;
+      commentList.appendChild(div);
+    });
+  });
+}
+
+window.toggleLike = async (statusId, uid, isLiked) => {
+  if (!currentUser) {
+    showToast("Vui lòng đăng nhập để thích trạng thái!");
+    return;
+  }
+  try {
+    const statusRef = doc(db, "users", uid, "statuses", statusId);
+    if (isLiked) {
+      await updateDoc(statusRef, {
+        likes: arrayRemove(currentUser.uid)
+      });
+      showToast("Đã bỏ thích trạng thái.");
+    } else {
+      await updateDoc(statusRef, {
+        likes: arrayUnion(currentUser.uid)
+      });
+      showToast("Đã thích trạng thái!");
+    }
+  } catch (error) {
+    showToast(`Lỗi khi thích trạng thái: ${error.message}`);
+  }
+};
+
+window.toggleCommentSection = (sectionId) => {
+  const section = document.getElementById(sectionId);
+  section.style.display = section.style.display === "block" ? "none" : "block";
+};
+
+window.postComment = async (statusId, uid) => {
+  if (!currentUser) {
+    showToast("Vui lòng đăng nhập để bình luận!");
+    return;
+  }
+  const commentInput = document.getElementById(`comment-input-${statusId}`);
+  const commentText = commentInput.value.trim();
+  if (!commentText) {
+    showToast("Bình luận không được để trống!");
+    return;
+  }
+  try {
+    const commentsRef = collection(db, "users", uid, "statuses", statusId, "comments");
+    await addDoc(commentsRef, {
+      userId: currentUser.uid,
+      name: currentUserData.name || "Người dùng",
+      isVerified: currentUserData.isVerified || false,
+      text: commentText,
+      createdAt: new Date()
+    });
+    commentInput.value = "";
+    showToast("Đã đăng bình luận!");
+  } catch (error) {
+    showToast(`Lỗi khi đăng bình luận: ${error.message}`);
+  }
+};
 
 document.getElementById("upload-pic-button").addEventListener("click", () => {
   document.getElementById("profile-pic-input").click();
@@ -216,58 +405,50 @@ document.getElementById("upload-pic-button").addEventListener("click", () => {
 document.getElementById("profile-pic-input").addEventListener("change", async (event) => {
   const file = event.target.files[0];
   if (!file || !currentUser) {
-    alert("Vui lòng chọn file ảnh hoặc đăng nhập lại.");
+    showToast("Vui lòng chọn file ảnh hoặc đăng nhập lại.");
     return;
   }
 
   try {
-    console.log("Bắt đầu upload ảnh:", { fileName: file.name, fileSize: file.size, fileType: file.type });
-
     if (!file.type.startsWith("image/")) {
-      alert("Vui lòng chọn file ảnh (jpg, png, ...).");
+      showToast("Vui lòng chọn file ảnh (jpg, png, ...).");
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      alert("File ảnh quá lớn. Vui lòng chọn file nhỏ hơn 5MB.");
+      showToast("File ảnh quá lớn. Vui lòng chọn file nhỏ hơn 5MB.");
       return;
     }
 
     const fileRef = ref(storage, `profile_pics/${currentUser.uid}/${Date.now()}_${file.name}`);
-    console.log("Đang upload file tới:", fileRef.fullPath);
-    const uploadTask = await uploadBytes(fileRef, file);
-    console.log("Upload thành công:", uploadTask);
-
+    await uploadBytes(fileRef, file);
     const fileURL = await getDownloadURL(fileRef);
-    console.log("URL ảnh:", fileURL);
-
-    console.log("Cập nhật profilePic trong Firestore cho user:", currentUser.uid);
     await updateDoc(doc(db, "users", currentUser.uid), { profilePic: fileURL });
-
-    const profilePic = document.getElementById("profile-pic");
-    profilePic.src = `${fileURL}?t=${Date.now()}`;
     currentUserData.profilePic = fileURL;
     event.target.value = "";
-    alert("Cập nhật ảnh đại diện thành công!");
+    showToast("Cập nhật ảnh đại diện thành công!");
   } catch (error) {
-    console.error("Lỗi khi upload ảnh:", error.code, error.message);
-    alert(`Lỗi: ${error.message}`);
+    showToast(`Lỗi khi upload ảnh: ${error.message}`);
   }
 });
 
 document.getElementById("post-status-button").addEventListener("click", async () => {
   const statusText = document.getElementById("status-input").value.trim();
-  if (!statusText || !currentUser) return;
+  if (!statusText || !currentUser) {
+    showToast("Trạng thái không được để trống!");
+    return;
+  }
 
   try {
     const statusesRef = collection(db, "users", currentUser.uid, "statuses");
     await addDoc(statusesRef, {
       text: statusText,
-      createdAt: new Date()
+      createdAt: new Date(),
+      likes: []
     });
     document.getElementById("status-input").value = "";
-    alert("Đăng trạng thái thành công!");
+    showToast("Đăng trạng thái thành công!");
   } catch (error) {
-    alert(`Lỗi khi đăng trạng thái: ${error.message}`);
+    showToast(`Lỗi khi đăng trạng thái: ${error.message}`);
   }
 });
 
@@ -280,7 +461,7 @@ window.editStatus = (statusId, currentText) => {
   document.getElementById("save-status-button").onclick = async () => {
     const newText = input.value.trim();
     if (!newText) {
-      alert("Trạng thái không được để trống!");
+      showToast("Trạng thái không được để trống!");
       return;
     }
     try {
@@ -289,9 +470,9 @@ window.editStatus = (statusId, currentText) => {
         updatedAt: new Date()
       });
       modal.style.display = "none";
-      alert("Chỉnh sửa trạng thái thành công!");
+      showToast("Chỉnh sửa trạng thái thành công!");
     } catch (error) {
-      alert(`Lỗi khi chỉnh sửa trạng thái: ${error.message}`);
+      showToast(`Lỗi khi chỉnh sửa trạng thái: ${error.message}`);
     }
   };
 
@@ -304,9 +485,9 @@ window.deleteStatus = async (statusId) => {
   if (!confirm("Bạn có chắc muốn xóa trạng thái này?")) return;
   try {
     await deleteDoc(doc(db, "users", currentUser.uid, "statuses", statusId));
-    alert("Xóa trạng thái thành công!");
+    showToast("Xóa trạng thái thành công!");
   } catch (error) {
-    alert(`Lỗi khi xóa trạng thái: ${error.message}`);
+    showToast(`Lỗi khi xóa trạng thái: ${error.message}`);
   }
 };
 
@@ -330,7 +511,7 @@ onAuthStateChanged(auth, async (user) => {
   try {
     const userSnap = await getDoc(doc(db, "users", profileUid));
     if (!userSnap.exists()) {
-      alert("Không tìm thấy thông tin người dùng.");
+      showToast("Không tìm thấy thông tin người dùng.");
       window.location.href = "index.html";
       return;
     }
@@ -340,11 +521,10 @@ onAuthStateChanged(auth, async (user) => {
     loadFriends(profileUid);
     loadStatuses(profileUid, isOwnProfile);
   } catch (error) {
-    alert(`Lỗi khi tải hồ sơ: ${error.message}`);
+    showToast(`Lỗi khi tải hồ sơ: ${error.message}`);
     window.location.href = "index.html";
   }
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932c0e112efa78d1',t:'MTc0NTA2MjA3MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932d5efd6f95677e',t:'MTc0NTA3NTg3MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
