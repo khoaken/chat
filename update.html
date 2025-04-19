@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Cập nhật thông tin - KKChat</title>
-  <meta name="apple-Mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="ChatUp" />
   <meta name="theme-color" content="#4a90e2" />
@@ -111,6 +111,8 @@
         <button id="update-name-button" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Cập nhật tên</button>
       </div>
       <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">Mật khẩu cũ</label>
+        <input id="old-password" type="password" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Nhập mật khẩu cũ">
         <label class="block text-sm font-medium mb-1">Mật khẩu mới</label>
         <input id="update-password" type="password" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Nhập mật khẩu mới">
         <button id="update-password-button" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Cập nhật mật khẩu</button>
@@ -125,7 +127,7 @@
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, updateProfile, updatePassword } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, updateProfile, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
 import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -173,19 +175,31 @@ document.getElementById("update-name-button").addEventListener("click", async ()
 });
 
 document.getElementById("update-password-button").addEventListener("click", async () => {
+  const oldPassword = document.getElementById("old-password").value.trim();
   const newPassword = document.getElementById("update-password").value.trim();
+  if (!oldPassword) {
+    alert("Vui lòng nhập mật khẩu cũ!");
+    return;
+  }
   if (!newPassword || newPassword.length < 6) {
-    alert("Mật khẩu phải có ít nhất 6 ký tự!");
+    alert("Mật khẩu mới phải có ít nhất 6 ký tự!");
     return;
   }
 
   try {
     const user = auth.currentUser;
+    const credential = EmailAuthProvider.credential(user.email, oldPassword);
+    await reauthenticateWithCredential(user, credential);
     await updatePassword(user, newPassword);
     alert("Cập nhật mật khẩu thành công!");
+    document.getElementById("old-password").value = "";
     document.getElementById("update-password").value = "";
   } catch (error) {
-    alert(`Lỗi khi cập nhật mật khẩu: ${error.message}`);
+    if (error.code === "auth/wrong-password") {
+      alert("Mật khẩu cũ không đúng!");
+    } else {
+      alert(`Lỗi khi cập nhật mật khẩu: ${error.message}`);
+    }
   }
 });
 
