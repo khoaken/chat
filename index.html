@@ -67,6 +67,18 @@
         <button onclick="updateProfile()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Cập nhật</button>
       </div>
 
+      <div id="admin-ui" class="bg-white p-6 rounded-lg shadow-md mb-6 hidden">
+        <h3 class="text-lg font-semibold mb-4">Quản lý xu (Admin)</h3>
+        <input id="admin-user-email" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Email người dùng">
+        <input id="admin-coins" type="number" min="1" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Số xu cấp">
+        <button onclick="addCoins()" class="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700">Cấp xu</button>
+      </div>
+
+      <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+        <h3 class="text-lg font-semibold mb-4">Chơi Game Cá Cược</h3>
+        <button onclick="window.location.href='cacuoc.html'" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Vào Game</button>
+      </div>
+
       <div class="bg-white p-6 rounded-lg shadow-md mb-6">
         <input id="search-user" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Tìm email người dùng...">
         <button onclick="searchUser()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Tìm kiếm</button>
@@ -112,6 +124,8 @@
   const db = getFirestore(app);
   const storage = getStorage(app);
 
+  const ADMIN_EMAIL = "khoakenlol@gmail.com"; // Define admin email
+
   window.switchTab = function(tabId) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.toggle('hidden', el.id !== tabId));
   }
@@ -125,8 +139,8 @@
 
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, pass);
-      await setDoc(doc(db, "users", cred.user.uid), { name, dob, email });
-    alert("Đăng ký thành công!");
+      await setDoc(doc(db, "users", cred.user.uid), { name, dob, email, balance: 1000 });
+      alert("Đăng ký thành công!");
     } catch (err) {
       alert("Lỗi: " + err.message);
     }
@@ -242,6 +256,29 @@
     alert("Cập nhật thành công!");
   }
 
+  window.addCoins = async function() {
+    const user = auth.currentUser;
+    if (!user || user.email !== ADMIN_EMAIL) return alert("Chỉ admin mới có quyền cấp xu!");
+
+    const email = document.getElementById('admin-user-email').value.trim();
+    const coins = parseInt(document.getElementById('admin-coins').value);
+
+    if (!email) return alert("Vui lòng nhập email người dùng.");
+    if (!coins || coins <= 0) return alert("Số xu phải lớn hơn 0.");
+
+    const q = query(collection(db, "users"), where("email", "==", email));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) return alert("Không tìm thấy người dùng với email này.");
+
+    const userDoc = snapshot.docs[0];
+    const currentBalance = userDoc.data().balance || 0;
+    const newBalance = currentBalance + coins;
+
+    await updateDoc(doc(db, "users", userDoc.id), { balance: newBalance });
+    alert(`Đã cấp ${coins} xu cho ${email}. Số dư mới: ${newBalance} xu.`);
+  }
+
   window.openChatPage = function(friendId) {
     window.location.href = `chat.html?uid=${friendId}`;
   }
@@ -253,10 +290,19 @@
       const userSnap = await getDoc(doc(db, "users", user.uid));
       const userData = userSnap.data();
       document.getElementById("username").innerText = userData.name;
+      
+      // Show admin UI if the user is admin
+      if (user.email === ADMIN_EMAIL) {
+        document.getElementById("admin-ui").classList.remove("hidden");
+      } else {
+        document.getElementById("admin-ui").classList.add("hidden");
+      }
+
       loadFriendsAndRequests(user.uid);
     } else {
       document.getElementById("auth").classList.remove("hidden");
       document.getElementById("friends-ui").classList.add("hidden");
+      document.getElementById("admin-ui").classList.add("hidden");
     }
   });
 
@@ -271,5 +317,6 @@
   window.login = login;
   window.logout = logout;
 </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9328ca2ff83ebd5e',t:'MTc0NTAyNzgzMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
