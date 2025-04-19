@@ -33,6 +33,7 @@
   <div id="chat-container" class="flex flex-col h-screen">
     <div id="chat-header" class="bg-blue-600 text-white p-4 flex items-center shadow-md">
       <span id="chat-title" class="flex-1 text-lg font-semibold">Đang chat với ...</span>
+      <button id="view-profile-button" class="mr-2 bg-transparent border-none text-xl">👤</button>
       <button id="voice-call-button" class="mr-2 bg-transparent border-none text-xl">📞</button>
       <button id="video-call-button" class="mr-2 bg-transparent border-none text-xl">🎥</button>
       <button id="dark-toggle" class="bg-transparent border-none text-xl">🌙</button>
@@ -75,7 +76,7 @@ let currentChatId = null;
 let currentChatPartner = null;
 let currentUser = null;
 
-function renderMessage(msg, id) {
+async function renderMessage(msg, id) {
   const div = document.createElement('div');
   div.className = `message ${msg.sender === currentUser.uid ? 'mine bg-blue-100' : 'theirs bg-white'} max-w-[70%] p-3 rounded-lg shadow-sm`;
   const date = msg.createdAt.toDate();
@@ -86,7 +87,14 @@ function renderMessage(msg, id) {
   if (msg.isVideo) content = `<video controls src="${msg.text}" style="max-width: 200px; border-radius: 8px;"></video>`;
   if (msg.isAudio) content = `<audio controls src="${msg.text}" style="max-width: 200px;"></audio>`;
 
+  const senderData = (await getDoc(doc(db, "users", msg.sender))).data();
+  const senderName = senderData.name || "Người dùng";
+  const isVerified = senderData.isVerified || false;
+
   div.innerHTML = `
+    <div class="flex items-center gap-2">
+      <span class="font-semibold">${senderName}${isVerified ? " ✅" : ""}</span>
+    </div>
     <div>${content}</div>
     <div class="timestamp text-xs text-gray-500 mt-1 text-right">${dateStr} ${timeStr}</div>
     <div class="reactions flex gap-1 mt-1">${renderReactions(msg.reactions || {})}</div>
@@ -136,8 +144,9 @@ function renderReactions(reactions) {
   return Object.entries(reactionCounts).map(([emoji, count]) => `<span class="reaction">${emoji}${count > 1 ? count : ''}</span>`).join('');
 }
 
-function setupChat(friendId, friendName) {
-  document.getElementById("chat-title").innerText = `Đang chat với ${friendName}`;
+async function setupChat(friendId, friendName) {
+  const partnerData = (await getDoc(doc(db, "users", friendId))).data();
+  document.getElementById("chat-title").innerText = `Đang chat với ${friendName}${partnerData.isVerified ? " ✅" : ""}`;
   const chatId = [currentUser.uid, friendId].sort().join('_');
   currentChatId = chatId;
   const chatRef = collection(db, "chats", chatId, "messages");
@@ -153,7 +162,6 @@ function setupChat(friendId, friendName) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
   });
 
-  // Typing indicator
   const typingRef = doc(db, "chats", currentChatId, "typing", currentUser.uid);
   onSnapshot(collection(db, "chats", currentChatId, "typing"), (snapshot) => {
     const typingUsers = [];
@@ -162,8 +170,12 @@ function setupChat(friendId, friendName) {
         typingUsers.push(doc.id);
       }
     });
-    document.getElementById("typing-status").innerText = typingUsers.length ? `${friendName} đang nhập...` : '';
+    document.getElementById("typing-status").innerText = typingUsers.length ? `${friendName}${partnerData.isVerified ? " ✅" : ""} đang nhập...` : '';
   });
+
+  document.getElementById("view-profile-button").onclick = () => {
+    window.location.href = `profile.html?uid=${friendId}`;
+  };
 }
 
 document.getElementById("send-button").addEventListener("click", async () => {
@@ -238,12 +250,6 @@ document.getElementById("file-input").addEventListener("change", async (event) =
 
   event.target.value = "";
 });
-
-// Voice call + Video call
-let localStream = null;
-let remoteStream = null;
-let peerConnection = null;
-const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
 
 async function startCall(videoEnabled) {
   localStream = await navigator.mediaDevices.getUserMedia({ video: videoEnabled, audio: true });
@@ -329,7 +335,6 @@ if ("Notification" in window && Notification.permission !== "granted") {
   Notification.requestPermission();
 }
 
-// Emoji picker
 const emojiPicker = new Picker({
   data: async () => (await import("https://cdn.jsdelivr.net/npm/@emoji-mart/data@latest/+esm")).default,
   onEmojiSelect: async (emoji) => {
@@ -347,7 +352,6 @@ document.getElementById("emoji-button").addEventListener("click", () => {
   setTimeout(() => pickerContainer.remove(), 5000);
 });
 
-// Voice message
 document.getElementById("voice-button").addEventListener("click", async () => {
   if (!navigator.mediaDevices || !window.MediaRecorder) return alert("Trình duyệt không hỗ trợ ghi âm.");
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -385,7 +389,6 @@ document.getElementById("voice-button").addEventListener("click", async () => {
   }, 10000);
 });
 
-// New message notification
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") document.title = "ChatUp Professional";
 });
@@ -402,5 +405,6 @@ onAuthStateChanged(auth, async (user) => {
   setupChat(partnerId, partnerData.name);
 });
 </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932c0e109f32afb6',t:'MTc0NTA2MjA2OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
