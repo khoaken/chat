@@ -3,125 +3,270 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>ChatUp</title>
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="Chat" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>ChatUp Updated</title>
   <meta name="theme-color" content="#4a90e2" />
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icon-192.png">
   <style>
     body { font-family: sans-serif; margin: 0; padding: 0; background: #f2f2f2; }
     #chat-container { display: flex; flex-direction: column; height: 100vh; }
-    #chat-header { padding: 10px; background: #4a90e2; color: white; font-size: 18px; }
+    #chat-header { padding: 10px; background: #4a90e2; color: white; font-size: 18px; display: flex; align-items: center; }
+    #chat-title { flex: 1; }
+    #chat-header button { margin-left: 8px; background: transparent; border: none; font-size: 20px; color: white; cursor: pointer; }
     #chat-messages { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
     .message { max-width: 70%; padding: 8px 12px; border-radius: 12px; position: relative; word-wrap: break-word; }
     .mine { background: #d1eaff; align-self: flex-end; border-bottom-right-radius: 0; }
     .theirs { background: #ffffff; align-self: flex-start; border-bottom-left-radius: 0; }
     .timestamp { font-size: 10px; color: #888; margin-top: 4px; text-align: right; }
-    #chat-input-area { display: flex; padding: 10px; background: #fff; border-top: 1px solid #ccc; }
+    #chat-input-area { display: flex; padding: 10px; background: #fff; border-top: 1px solid #ccc; align-items: center; }
     #chat-input { flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
-    #send-button { margin-left: 10px; padding: 8px 16px; border: none; background: #4a90e2; color: white; border-radius: 6px; cursor: pointer; }
+    #send-button, #upload-button { margin-left: 10px; padding: 8px 16px; border: none; background: #4a90e2; color: white; border-radius: 6px; cursor: pointer; }
+    #file-input { display: none; }
   </style>
 </head>
 <body>
   <div id="chat-container">
-    <div id="chat-header">Đang chat với ...</div>
+    <div id="chat-header">
+      <span id="chat-title">Đang chat với ...</span>
+      <button id="voice-call-button">📞</button>
+      <button id="video-call-button">🎥</button>
+    </div>
     <div id="chat-messages"></div>
     <div id="chat-input-area">
+      <input type="file" id="file-input" accept="image/*,video/*" />
+      <button id="upload-button">📎</button>
       <input type="text" id="chat-input" placeholder="Nhập tin nhắn...">
       <button id="send-button">Gửi</button>
     </div>
   </div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, setDoc, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, setDoc, doc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
-      authDomain: "chatup-7fed7.firebaseapp.com",
-      projectId: "chatup-7fed7",
-      storageBucket: "chatup-7fed7.appspot.com",
-      messagingSenderId: "287838782402",
-      appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
-    };
+const firebaseConfig = {
+  apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
+  authDomain: "chatup-7fed7.firebaseapp.com",
+  projectId: "chatup-7fed7",
+  storageBucket: "chatup-7fed7.appspot.com",
+  messagingSenderId: "287838782402",
+  appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
+};
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
 
-    let currentChatId = null;
-    let currentChatPartner = null;
-    let currentUser = null;
+let currentChatId = null;
+let currentChatPartner = null;
+let currentUser = null;
 
-    function getTimeString(date) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
+function renderMessage(msg, id) {
+  const div = document.createElement('div');
+  div.className = `message ${msg.sender === currentUser.uid ? 'mine' : 'theirs'}`;
+  const date = msg.createdAt.toDate();
+  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dateStr = date.toLocaleDateString();
+  div.innerHTML = `<div>${msg.text}</div><div class="timestamp">${dateStr} ${timeStr}</div>`;
 
-    function renderMessage(msg) {
-      const div = document.createElement('div');
-      div.className = `message ${msg.sender === currentUser.uid ? 'mine' : 'theirs'}`;
-      div.innerHTML = `
-        <div>${msg.text}</div>
-        <div class="timestamp">${getTimeString(msg.createdAt.toDate())}</div>
-      `;
-      return div;
-    }
-
-    function setupChat(friendId, friendName) {
-      document.getElementById("chat-header").innerText = `Đang chat với ${friendName}`;
-
-      const chatId = [currentUser.uid, friendId].sort().join('_');
-      currentChatId = chatId;
-
-      const chatRef = collection(db, "chats", chatId, "messages");
-      const q = query(chatRef, orderBy("createdAt"));
-
-      onSnapshot(q, (snapshot) => {
-        const chatMessages = document.getElementById("chat-messages");
-        chatMessages.innerHTML = '';
-        snapshot.forEach(docSnap => {
-          const msg = docSnap.data();
-          chatMessages.appendChild(renderMessage(msg));
-        });
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      });
-    }
-
-    document.getElementById("send-button").addEventListener("click", async () => {
-      const input = document.getElementById("chat-input");
-      const text = input.value.trim();
-      if (!text || !currentChatId) return;
-      const chatRef = collection(db, "chats", currentChatId, "messages");
-
-      await addDoc(chatRef, {
-        sender: currentUser.uid,
-        text,
-        createdAt: new Date()
-      });
-
-      await setDoc(doc(db, "chats", currentChatId), {
-        participants: [currentUser.uid, currentChatPartner],
-        lastMessage: text,
-        updatedAt: new Date()
-      });
-
-      input.value = '';
+  if (msg.sender === currentUser.uid) {
+    // Chuột phải
+    div.addEventListener('contextmenu', async (e) => {
+      e.preventDefault();
+      if (confirm("Thu hồi tin nhắn này?")) {
+        await deleteDoc(doc(db, "chats", currentChatId, "messages", id));
+      }
     });
-
-    onAuthStateChanged(auth, async (user) => {
-      if (!user) return;
-      currentUser = user;
-      const urlParams = new URLSearchParams(window.location.search);
-      const partnerId = urlParams.get("uid");
-      if (!partnerId) return;
-      currentChatPartner = partnerId;
-      const partnerSnap = await getDoc(doc(db, "users", partnerId));
-      const partnerData = partnerSnap.data();
-      setupChat(partnerId, partnerData.name);
+    // Ấn giữ mobile
+    let pressTimer;
+    div.addEventListener('touchstart', (e) => {
+      pressTimer = setTimeout(async () => {
+        if (confirm("Thu hồi tin nhắn này?")) {
+          await deleteDoc(doc(db, "chats", currentChatId, "messages", id));
+        }
+      }, 600);
     });
-  </script>
+    div.addEventListener('touchend', (e) => clearTimeout(pressTimer));
+  }
+  return div;
+}
+
+function setupChat(friendId, friendName) {
+  document.getElementById("chat-title").innerText = `Đang chat với ${friendName}`;
+  const chatId = [currentUser.uid, friendId].sort().join('_');
+  currentChatId = chatId;
+  const chatRef = collection(db, "chats", chatId, "messages");
+  const q = query(chatRef, orderBy("createdAt"));
+
+  onSnapshot(q, (snapshot) => {
+    const chatMessages = document.getElementById("chat-messages");
+    chatMessages.innerHTML = '';
+    snapshot.forEach(docSnap => {
+      const msg = docSnap.data();
+      chatMessages.appendChild(renderMessage(msg, docSnap.id));
+    });
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  });
+}
+
+document.getElementById("send-button").addEventListener("click", async () => {
+  const input = document.getElementById("chat-input");
+  const text = input.value.trim();
+  if (!text || !currentChatId) return;
+  const chatRef = collection(db, "chats", currentChatId, "messages");
+
+  await addDoc(chatRef, {
+    sender: currentUser.uid,
+    text,
+    createdAt: new Date()
+  });
+
+  await setDoc(doc(db, "chats", currentChatId), {
+    participants: [currentUser.uid, currentChatPartner],
+    lastMessage: text,
+    updatedAt: new Date()
+  });
+
+  input.value = '';
+});
+
+document.getElementById("chat-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    document.getElementById("send-button").click();
+  }
+});
+
+document.getElementById("upload-button").addEventListener("click", () => {
+  document.getElementById("file-input").click();
+});
+
+document.getElementById("file-input").addEventListener("change", async (event) => {
+  const file = event.target.files[0];
+  if (!file || !currentChatId) return;
+
+  const fileRef = ref(storage, `uploads/${currentChatId}/${Date.now()}_${file.name}`);
+  await uploadBytes(fileRef, file);
+  const fileURL = await getDownloadURL(fileRef);
+
+  const isImage = file.type.startsWith("image/");
+  const isVideo = file.type.startsWith("video/");
+  let content = '';
+  if (isImage) {
+    content = `<img src="${fileURL}" style="max-width: 200px; border-radius: 8px;" />`;
+  } else if (isVideo) {
+    content = `<video controls src="${fileURL}" style="max-width: 200px; border-radius: 8px;"></video>`;
+  }
+
+  const chatRef = collection(db, "chats", currentChatId, "messages");
+  await addDoc(chatRef, {
+    sender: currentUser.uid,
+    text: content,
+    createdAt: new Date()
+  });
+
+  await setDoc(doc(db, "chats", currentChatId), {
+    participants: [currentUser.uid, currentChatPartner],
+    lastMessage: "[Đã gửi file]",
+    updatedAt: new Date()
+  });
+
+  event.target.value = "";
+});
+
+// Voice call + Video call
+let localStream = null;
+let remoteStream = null;
+let peerConnection = null;
+const servers = { iceServers: [{ urls: "stun:stun.l.google.com:19302" }] };
+
+async function startCall(videoEnabled) {
+  localStream = await navigator.mediaDevices.getUserMedia({ video: videoEnabled, audio: true });
+  remoteStream = new MediaStream();
+  peerConnection = new RTCPeerConnection(servers);
+
+  localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+  peerConnection.ontrack = event => {
+    event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
+  };
+
+  const callDoc = doc(collection(db, "calls"));
+  const offerCandidates = collection(callDoc, "offerCandidates");
+  const answerCandidates = collection(callDoc, "answerCandidates");
+
+  peerConnection.onicecandidate = event => {
+    if (event.candidate) {
+      addDoc(offerCandidates, event.candidate.toJSON());
+    }
+  };
+
+  const offerDescription = await peerConnection.createOffer();
+  await peerConnection.setLocalDescription(offerDescription);
+
+  const offer = {
+    sdp: offerDescription.sdp,
+    type: offerDescription.type,
+  };
+
+  await setDoc(callDoc, { offer, from: currentUser.uid, to: currentChatPartner });
+
+  onSnapshot(callDoc, async (snapshot) => {
+    const data = snapshot.data();
+    if (!peerConnection.currentRemoteDescription && data?.answer) {
+      const answerDescription = new RTCSessionDescription(data.answer);
+      await peerConnection.setRemoteDescription(answerDescription);
+    }
+  });
+
+  onSnapshot(answerCandidates, (snapshot) => {
+    snapshot.docChanges().forEach(change => {
+      if (change.type === "added") {
+        const candidate = new RTCIceCandidate(change.doc.data());
+        peerConnection.addIceCandidate(candidate);
+      }
+    });
+  });
+
+  openCallWindow(localStream, remoteStream);
+}
+
+function openCallWindow(local, remote) {
+  const callWindow = window.open("", "_blank", "width=600,height=400");
+  callWindow.document.write(`
+    <h2>Đang gọi...</h2>
+    <video id="localVideo" autoplay muted playsinline style="width: 45%;"></video>
+    <video id="remoteVideo" autoplay playsinline style="width: 45%;"></video>
+  `);
+  const localVideo = callWindow.document.getElementById("localVideo");
+  const remoteVideo = callWindow.document.getElementById("remoteVideo");
+  localVideo.srcObject = local;
+  remoteVideo.srcObject = remote;
+}
+
+document.getElementById("voice-call-button").addEventListener("click", () => {
+  startCall(false);
+});
+
+document.getElementById("video-call-button").addEventListener("click", () => {
+  startCall(true);
+});
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) return;
+  currentUser = user;
+  const urlParams = new URLSearchParams(window.location.search);
+  const partnerId = urlParams.get("uid");
+  if (!partnerId) return;
+  currentChatPartner = partnerId;
+  const partnerSnap = await getDoc(doc(db, "users", partnerId));
+  const partnerData = partnerSnap.data();
+  setupChat(partnerId, partnerData.name);
+});
+</script>
+
 </body>
 </html>
