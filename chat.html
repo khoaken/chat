@@ -34,7 +34,7 @@
       height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
       display: flex;
       flex-direction: column;
-      overflow: hidden; /* Ngăn overflow */
+      overflow: hidden;
     }
     .chat-header {
       padding: 15px;
@@ -114,66 +114,40 @@
       font-size: 0.85rem;
       margin: 10px 0;
     }
-    .message-actions {
+    .message-actions-container {
       display: none;
       position: absolute;
-      top: -30px;
+      top: -40px;
       right: 10px;
+      z-index: 10;
+      gap: 4px;
+      opacity: 0;
+      transition: opacity 0.2s ease-in-out, display 0.2s ease-in-out;
+    }
+    .message:hover .message-actions-container,
+    .message-actions-container:hover {
+      display: flex;
+      opacity: 1;
+      transition-delay: 0.1s;
+    }
+    .message-actions {
       background: #fff;
       border: 1px solid #e2e8f0;
       border-radius: 5px;
       box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-      z-index: 10;
-    }
-    .message:hover .message-actions {
-      display: block;
+      position: relative;
     }
     .message-actions button {
       display: block;
-      padding: 5px 10px;
+      padding: 4px 8px;
       background: none;
       border: none;
       color: #1a202c;
       cursor: pointer;
+      font-size: 0.85rem;
     }
     .message-actions button:hover {
       background: #e2e8f0;
-    }
-    .reaction-picker {
-      display: none;
-      position: absolute;
-      top: -50px;
-      left: 10px;
-      background: #fff;
-      border: 1px solid #e2e8f0;
-      border-radius: 20px;
-      padding: 5px;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-      z-index: 10;
-    }
-    .message:hover .reaction-picker {
-      display: flex;
-      gap: 5px;
-    }
-    .reaction-picker button {
-      background: none;
-      border: none;
-      font-size: 1.2rem;
-      cursor: pointer;
-    }
-    .reactions {
-      display: flex;
-      gap: 5px;
-      margin-top: 5px;
-      font-size: 0.9rem;
-    }
-    .reaction {
-      background: #e2e8f0;
-      border-radius: 10px;
-      padding: 2px 8px;
-    }
-    .message.sent .reaction {
-      background: #a3bffa;
     }
     .read-receipt {
       font-size: 0.8rem;
@@ -285,18 +259,45 @@
       border-color: #718096;
       color: #e2e8f0;
     }
-    .dark-mode .message-actions, .dark-mode .reaction-picker {
+    .dark-mode .message-actions {
       background: #2d3748;
       border-color: #4a5568;
     }
-    .dark-mode .message-actions button:hover, .dark-mode .reaction-picker button:hover {
+    .dark-mode .message-actions button:hover {
       background: #4a5568;
     }
-    .dark-mode .reaction {
-      background: #4a5568;
+    .mobile-context-menu {
+      position: fixed;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+      z-index: 100;
+      padding: 10px;
+      display: none;
     }
-    .dark-mode .message.sent .reaction {
-      background: #2b6cb0;
+    .dark-mode .mobile-context-menu {
+      background: #2d3748;
+      border-color: #4a5568;
+    }
+    .mobile-context-menu button {
+      display: block;
+      padding: 8px 12px;
+      background: none;
+      border: none;
+      color: #1a202c;
+      text-align: left;
+      width: 100%;
+      font-size: 0.85rem;
+    }
+    .dark-mode .mobile-context-menu button {
+      color: #e2e8f0;
+    }
+    .mobile-context-menu button:hover {
+      background: #e2e8f0;
+    }
+    .dark-mode .mobile-context-menu button:hover {
+      background: #4a5568;
     }
     .profile-pic {
       object-fit: cover;
@@ -330,6 +331,9 @@
       .message {
         max-width: 85%;
       }
+      .message-actions-container {
+        display: none !important;
+      }
     }
     @media (max-width: 430px) {
       .chat-input input {
@@ -355,7 +359,7 @@
       <!-- Messages will be dynamically added here -->
     </div>
     <div class="typing-indicator" id="typing-indicator">Đang gõ...</div>
-    <div class="chat-input">
+    <div class="chat-input" id="chat-input">
       <button class="emoji-button" id="emoji-button">😊</button>
       <emoji-picker id="emoji-picker"></emoji-picker>
       <button class="image-upload-button" id="image-upload-button">📷</button>
@@ -364,6 +368,7 @@
       <button id="send-button">Gửi</button>
     </div>
   </div>
+  <div id="mobile-context-menu" class="mobile-context-menu"></div>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
@@ -387,7 +392,6 @@
     const storage = getStorage(app);
     let lastMessageDate = null;
     let lastSenderId = null;
-    let lastSentMessageId = null;
 
     function getChatId(userId1, userId2) {
       return [userId1, userId2].sort().join('_');
@@ -455,6 +459,44 @@
       }
     }
 
+    function showMobileContextMenu(event, msgId, isSent, chatId, userId) {
+      const contextMenu = document.getElementById("mobile-context-menu");
+      contextMenu.innerHTML = `
+        ${isSent ? `
+          <button class="pin-button" data-msg-id="${msgId}">Ghim tin nhắn</button>
+          <button class="recall-button" data-msg-id="${msgId}">Thu hồi tin nhắn</button>
+        ` : ''}
+      `;
+      contextMenu.style.display = "block";
+      contextMenu.style.top = `${event.clientY}px`;
+      contextMenu.style.left = `${event.clientX}px`;
+
+      if (isSent) {
+        contextMenu.querySelector(".pin-button").addEventListener("click", async () => {
+          await updateDoc(doc(db, "chats", chatId), { pinnedMessageId: msgId });
+          loadPinnedMessage(chatId, userId);
+          contextMenu.style.display = "none";
+        });
+        contextMenu.querySelector(".recall-button").addEventListener("click", async () => {
+          await deleteDoc(doc(db, "chats", chatId, "messages", msgId));
+          const chatRef = doc(db, "chats", chatId);
+          const chatSnap = await getDoc(chatRef);
+          if (chatSnap.data()?.pinnedMessageId === msgId) {
+            await updateDoc(chatRef, { pinnedMessageId: null });
+          }
+          contextMenu.style.display = "none";
+        });
+      }
+
+      // Hide context menu when clicking outside
+      document.addEventListener("click", function hideContextMenu(e) {
+        if (!contextMenu.contains(e.target)) {
+          contextMenu.style.display = "none";
+          document.removeEventListener("click", hideContextMenu);
+        }
+      });
+    }
+
     function loadMessages(userId, friendId) {
       const chatId = getChatId(userId, friendId);
       const messagesRef = collection(db, "chats", chatId, "messages");
@@ -475,7 +517,7 @@
           .filter(msg => msg.senderId === userId)
           .slice(-1)[0];
 
-        messages.forEach((msg, index) => {
+        messages.forEach((msg) => {
           const msgDate = msg.timestamp ? formatDate(msg.timestamp) : '';
           if (msgDate && msgDate !== lastMessageDate) {
             lastMessageDate = msgDate;
@@ -497,36 +539,23 @@
           if (msg.senderId === userId && msg.id === lastSentMessage?.id && msg.readBy?.includes(friendId)) {
             content += `<div class="read-receipt">Đã đọc ✅</div>`;
           }
-          if (msg.reactions) {
-            content += `<div class="reactions">`;
-            Object.entries(msg.reactions).forEach(([emoji, users]) => {
-              content += `<span class="reaction">${emoji} ${users.length}</span>`;
-            });
-            content += `</div>`;
-          }
           if (msg.senderId === userId) {
             content += `
-              <div class="message-actions">
-                <button class="pin-button" data-msg-id="${msg.id}">Ghim</button>
-                <button class="recall-button" data-msg-id="${msg.id}">Thu hồi</button>
+              <div class="message-actions-container">
+                <div class="message-actions">
+                  <button class="pin-button" data-msg-id="${msg.id}">Ghim tin nhắn</button>
+                  <button class="recall-button" data-msg-id="${msg.id}">Thu hồi tin nhắn</button>
+                </div>
               </div>
             `;
           }
-          content += `
-            <div class="reaction-picker">
-              <button class="react-button" data-emoji="❤️">❤️</button>
-              <button class="react-button" data-emoji="😂">😂</button>
-              <button class="react-button" data-emoji="👍">👍</button>
-              <button class="react-button" data-emoji="😮">😮</button>
-            </div>
-          `;
           messageDiv.innerHTML = content;
           messagesDiv.appendChild(messageDiv);
 
+          // PC interactions
           if (msg.senderId === userId) {
             messageDiv.querySelector(".pin-button")?.addEventListener("click", async () => {
-              const chatRef = doc(db, "chats", chatId);
-              await updateDoc(chatRef, { pinnedMessageId: msg.id });
+              await updateDoc(doc(db, "chats", chatId), { pinnedMessageId: msg.id });
               loadPinnedMessage(chatId, userId);
             });
             messageDiv.querySelector(".recall-button")?.addEventListener("click", async () => {
@@ -538,14 +567,20 @@
               }
             });
           }
-          messageDiv.querySelectorAll(".react-button").forEach(button => {
-            button.addEventListener("click", async () => {
-              const emoji = button.dataset.emoji;
-              const msgRef = doc(db, "chats", chatId, "messages", msg.id);
-              await updateDoc(msgRef, {
-                [`reactions.${emoji}`]: arrayUnion(userId)
-              });
-            });
+
+          // Mobile long press
+          let touchTimeout;
+          messageDiv.addEventListener("touchstart", (e) => {
+            touchTimeout = setTimeout(() => {
+              e.preventDefault();
+              showMobileContextMenu(e, msg.id, msg.senderId === userId, chatId, userId);
+            }, 500);
+          });
+          messageDiv.addEventListener("touchend", () => {
+            clearTimeout(touchTimeout);
+          });
+          messageDiv.addEventListener("touchmove", () => {
+            clearTimeout(touchTimeout);
           });
 
           if (msg.senderId !== userId && !msg.readBy?.includes(userId)) {
@@ -583,13 +618,13 @@
       const chatId = getChatId(userId, friendId);
 
       try {
-        await addDoc(collection(db, "chats", chatId, "messages"), {
+        const messageData = {
           senderId: userId,
           text: text,
           timestamp: serverTimestamp(),
-          readBy: [userId],
-          reactions: {}
-        });
+          readBy: [userId]
+        };
+        await addDoc(collection(db, "chats", chatId, "messages"), messageData);
         messageInput.value = "";
       } catch (error) {
         showToast(`Lỗi khi gửi tin nhắn: ${error.message}`);
@@ -609,14 +644,14 @@
         const storageRef = ref(storage, `chat_images/${chatId}/${Date.now()}_${file.name}`);
         await uploadBytes(storageRef, file);
         const imageUrl = await getDownloadURL(storageRef);
-        await addDoc(collection(db, "chats", chatId, "messages"), {
+        const messageData = {
           senderId: userId,
           text: "",
           imageUrl: imageUrl,
           timestamp: serverTimestamp(),
-          readBy: [userId],
-          reactions: {}
-        });
+          readBy: [userId]
+        };
+        await addDoc(collection(db, "chats", chatId, "messages"), messageData);
         e.target.value = "";
       } catch (error) {
         showToast(`Lỗi khi tải ảnh lên: ${error.message}`);
@@ -695,5 +730,6 @@
       }
     });
   </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932d3ace3b08b0bb',t:'MTc0NTA3NDM4OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
