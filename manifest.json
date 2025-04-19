@@ -1,10 +1,10 @@
 {
     "name": "Khoaken Chat",
     "short_name": "Khoaken Chat",
-    "description": "Ứng dụng nhắn tin thời gian thực",
-    "start_url": "/chat.html",
+    "start_url": "/index.html",
+    "scope": "/",
     "display": "standalone",
-    "background_color": "#f4f4f4",
+    "background_color": "#4a90e2",
     "theme_color": "#4a90e2",
     "icons": [
       {
