@@ -97,9 +97,22 @@
       margin-top: 10px;
       padding-top: 10px;
       border-top: 1px solid #e2e8f0;
+      padding-bottom: env(safe-area-inset-bottom);
+      margin-bottom: 20px;
     }
     .dark-mode .comment-section {
       border-top: 1px solid #4a5568;
+    }
+    .reply-section {
+      margin-left: 40px;
+      margin-top: 10px;
+      padding-left: 10px;
+      border-left: 2px solid #e2e8f0;
+      padding-bottom: env(safe-area-inset-bottom);
+      margin-bottom: 20px;
+    }
+    .dark-mode .reply-section {
+      border-left: 2px solid #4a5568;
     }
     .comment-item {
       display: flex;
@@ -113,18 +126,12 @@
     .comment-item button:hover {
       transform: translateY(-1px);
     }
-    .comment-input {
+    textarea.comment-input {
       resize: none;
       font-size: 0.9rem;
-    }
-    .reply-section {
-      margin-left: 40px;
-      margin-top: 10px;
-      padding-left: 10px;
-      border-left: 2px solid #e2e8f0;
-    }
-    .dark-mode .reply-section {
-      border-left: 2px solid #4a5568;
+      min-height: 60px;
+      width: 100%;
+      box-sizing: border-box;
     }
     .comment-like-button.liked {
       color: #e53e3e;
@@ -364,10 +371,12 @@ function loadComments(uid, statusId) {
   const commentsRef = collection(db, "users", uid, "statuses", statusId, "comments");
   const q = query(commentsRef, orderBy("createdAt", "asc"));
   onSnapshot(q, async (snapshot) => {
+    console.log("[Debug] Comments snapshot for status:", statusId, snapshot.docs.length, "comments");
     commentList.innerHTML = "";
     for (const docSnap of snapshot.docs) {
       const comment = docSnap.data();
       const commentId = docSnap.id;
+      console.log("[Debug] Comment:", commentId, comment);
       const likesCount = comment.likes?.length || 0;
       const isLiked = comment.likes?.includes(currentUser?.uid) || false;
       const div = document.createElement("div");
@@ -399,6 +408,9 @@ function loadComments(uid, statusId) {
       commentList.appendChild(div);
       loadReplies(uid, statusId, commentId);
     }
+  }, (error) => {
+    console.error("[Error] Failed to load comments:", error);
+    showToast(`Lỗi khi tải bình luận: ${error.message}`);
   });
 }
 
@@ -407,10 +419,12 @@ function loadReplies(uid, statusId, commentId) {
   const repliesRef = collection(db, "users", uid, "statuses", statusId, "comments", commentId, "replies");
   const q = query(repliesRef, orderBy("createdAt", "asc"));
   onSnapshot(q, (snapshot) => {
+    console.log("[Debug] Replies snapshot for comment:", commentId, snapshot.docs.length, "replies");
     replyList.innerHTML = "";
     snapshot.forEach(docSnap => {
       const reply = docSnap.data();
       const replyId = docSnap.id;
+      console.log("[Debug] Reply:", replyId, reply);
       const likesCount = reply.likes?.length || 0;
       const isLiked = reply.likes?.includes(currentUser?.uid) || false;
       const div = document.createElement("div");
@@ -433,6 +447,9 @@ function loadReplies(uid, statusId, commentId) {
       `;
       replyList.appendChild(div);
     });
+  }, (error) => {
+    console.error("[Error] Failed to load replies:", error);
+    showToast(`Lỗi khi tải trả lời: ${error.message}`);
   });
 }
 
@@ -506,30 +523,59 @@ window.toggleReplyLike = async (uid, statusId, commentId, replyId, isLiked) => {
 };
 
 window.toggleCommentSection = (sectionId) => {
+  console.log("[Debug] Toggling comment section:", sectionId);
   const section = document.getElementById(sectionId);
+  if (!section) {
+    console.error("[Error] Comment section not found:", sectionId);
+    return;
+  }
   section.style.display = section.style.display === "block" ? "none" : "block";
 };
 
 window.showReplyInput = (inputId) => {
+  console.log("[Debug] Showing reply input:", inputId);
   const inputSection = document.getElementById(inputId);
+  if (!inputSection) {
+    console.error("[Error] Reply input not found:", inputId);
+    return;
+  }
   inputSection.classList.toggle("hidden");
 };
 
 window.postComment = async (statusId, uid, parentCommentId) => {
+  console.log("[Debug] postComment called with:", { statusId, uid, parentCommentId });
   if (!currentUser) {
+    console.log("[Debug] No currentUser, showing login toast");
     showToast("Vui lòng đăng nhập để bình luận!");
     return;
   }
+  if (!statusId || (parentCommentId && !parentCommentId)) {
+    console.error("[Error] Invalid statusId or parentCommentId:", { statusId, parentCommentId });
+    showToast("Lỗi: ID trạng thái hoặc bình luận không hợp lệ!");
+    return;
+  }
   const inputId = parentCommentId ? `reply-input-${parentCommentId}` : `comment-input-${statusId}`;
-  const commentInput = document.querySelector(`#${inputId} textarea`);
+  console.log("[Debug] Looking for textarea with ID:", inputId);
+  const commentInput = parentCommentId
+    ? document.querySelector(`#${inputId} textarea`)
+    : document.getElementById(inputId);
+  if (!commentInput) {
+    console.error("[Error] Textarea not found for ID:", inputId);
+    showToast("Lỗi giao diện: Không tìm thấy ô nhập bình luận!");
+    return;
+  }
   const commentText = commentInput.value.trim();
+  console.log("[Debug] Comment text:", commentText);
   if (!commentText) {
+    console.log("[Debug] Empty comment text");
     showToast("Bình luận không được để trống!");
     return;
   }
   try {
+    console.log("[Debug] Fetching current user data for UID:", currentUser.uid);
     const currentUserSnap = await getDoc(doc(db, "users", currentUser.uid));
     const currentUserDataLocal = currentUserSnap.data() || {};
+    console.log("[Debug] Current user data:", currentUserDataLocal);
     const commentData = {
       userId: currentUser.uid,
       name: currentUserDataLocal.name || "Người dùng",
@@ -538,20 +584,25 @@ window.postComment = async (statusId, uid, parentCommentId) => {
       createdAt: new Date(),
       likes: []
     };
+    console.log("[Debug] Comment data to be saved:", commentData);
     if (parentCommentId) {
       const repliesRef = collection(db, "users", uid, "statuses", statusId, "comments", parentCommentId, "replies");
+      console.log("[Debug] Adding reply to:", repliesRef.path);
       await addDoc(repliesRef, commentData);
       showToast("Đã đăng trả lời!");
     } else {
       const commentsRef = collection(db, "users", uid, "statuses", statusId, "comments");
+      console.log("[Debug] Adding comment to:", commentsRef.path);
       await addDoc(commentsRef, commentData);
       showToast("Đã đăng bình luận!");
     }
     commentInput.value = "";
     if (parentCommentId) {
+      console.log("[Debug] Hiding reply input:", `reply-input-${parentCommentId}`);
       document.getElementById(`reply-input-${parentCommentId}`).classList.add("hidden");
     }
   } catch (error) {
+    console.error("[Error] Failed to post comment:", error.code, error.message);
     showToast(`Lỗi khi đăng bình luận: ${error.message}`);
   }
 };
@@ -594,7 +645,6 @@ document.getElementById("profile-pic-input").addEventListener("change", async (e
     showToast("Vui lòng chọn file ảnh hoặc đăng nhập lại.");
     return;
   }
-
   try {
     if (!file.type.startsWith("image/")) {
       showToast("Vui lòng chọn file ảnh (jpg, png, ...).");
@@ -604,7 +654,6 @@ document.getElementById("profile-pic-input").addEventListener("change", async (e
       showToast("File ảnh quá lớn. Vui lòng chọn file nhỏ hơn 5MB.");
       return;
     }
-
     const fileRef = ref(storage, `profile_pics/${currentUser.uid}/${Date.now()}_${file.name}`);
     await uploadBytes(fileRef, file);
     const fileURL = await getDownloadURL(fileRef);
@@ -623,7 +672,6 @@ document.getElementById("post-status-button").addEventListener("click", async ()
     showToast("Trạng thái không được để trống!");
     return;
   }
-
   try {
     const statusesRef = collection(db, "users", currentUser.uid, "statuses");
     await addDoc(statusesRef, {
@@ -643,7 +691,6 @@ window.editStatus = (statusId, currentText) => {
   const input = document.getElementById("edit-status-input");
   input.value = currentText;
   modal.style.display = "flex";
-
   document.getElementById("save-status-button").onclick = async () => {
     const newText = input.value.trim();
     if (!newText) {
@@ -661,7 +708,6 @@ window.editStatus = (statusId, currentText) => {
       showToast(`Lỗi khi chỉnh sửa trạng thái: ${error.message}`);
     }
   };
-
   document.getElementById("cancel-status-button").onclick = () => {
     modal.style.display = "none";
   };
@@ -685,7 +731,9 @@ document.getElementById("dark-toggle").addEventListener("click", () => {
 if (localStorage.getItem("theme") === "dark") document.body.classList.add("dark-mode");
 
 onAuthStateChanged(auth, async (user) => {
+  console.log("[Debug] Auth state changed:", user ? user.uid : "No user");
   if (!user) {
+    console.log("[Debug] Redirecting to index.html due to no user");
     window.location.href = "index.html";
     return;
   }
@@ -693,7 +741,6 @@ onAuthStateChanged(auth, async (user) => {
   const urlParams = new URLSearchParams(window.location.search);
   profileUid = urlParams.get("uid") || user.uid;
   isOwnProfile = profileUid === user.uid;
-
   try {
     const userSnap = await getDoc(doc(db, "users", profileUid));
     if (!userSnap.exists()) {
@@ -713,5 +760,6 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932df4c1cbf4bcf2',t:'MTc0NTA4MjAwNC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
