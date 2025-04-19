@@ -35,7 +35,9 @@
     </div>
 
     <div id="game-ui" class="bg-white p-6 rounded-lg shadow-md">
-      <p class="text-lg mb-4">Số dư: <span id="balance" class="font-semibold">0</span> xu</p>
+      <p class="text-lg mb-4">Số dư: <span id="balance" class="font-semibold">0</span> xu
+        <button id="deposit-button" class="ml-4 bg-green-600 text-white px-3 py-1 rounded-lg hover:bg-green-700">Nạp tiền</button>
+      </p>
       <h3 class="text-lg font-semibold mb-4">Chơi Tài Xỉu & Chẵn Lẻ</h3>
       <div class="grid grid-cols-2 gap-4 mb-4">
         <button id="bet-tai" class="bet-button bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700" onclick="selectBet('tai')">Tài (11-18)</button>
@@ -52,7 +54,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
   import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-  import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+  import { getFirestore, doc, getDoc, updateDoc, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
@@ -98,8 +100,8 @@
     const balance = await loadBalance(user.uid);
     if (amount > balance) return alert("Số dư không đủ!");
 
-    // Start dice roll animation
-    resultDiv.innerHTML = `<p class="text-lg">Đang lắc xúc xắc... <span class="dice dice-rolling">🎲</span><span class="dice dice-rolling">🎲</span><span class="dice dice-rolling">🎲</span></p>`;
+    // Start dice roll animation with rolling dice
+    resultDiv.innerHTML = `<p class="text-lg">Đang lắc xúc xắc... <span class="dice dice-rolling">⚀</span><span class="dice dice-rolling">⚁</span><span class="dice dice-rolling">⚂</span></p>`;
     
     // Simulate roll with delay
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -112,8 +114,18 @@
     const taiXiuOutcome = total >= 11 && total <= 18 ? "tai" : "xiu";
     const chanLeOutcome = total % 2 === 0 ? "chan" : "le";
 
+    // Map dice numbers to Unicode dice faces
+    const diceFaces = {
+      1: '⚀',
+      2: '⚁',
+      3: '⚂',
+      4: '⚃',
+      5: '⚄',
+      6: '⚅'
+    };
+
     let newBalance = balance;
-    let message = `Kết quả: <span class="dice">${dice1}</span><span class="dice">${dice2}</span><span class="dice">${dice3}</span> (Tổng: ${total} - ${taiXiuOutcome === "tai" ? "Tài" : "Xỉu"}, ${chanLeOutcome === "chan" ? "Chẵn" : "Lẻ"}). `;
+    let message = `Kết quả: <span class="dice">${diceFaces[dice1]}</span><span class="dice">${diceFaces[dice2]}</span><span class="dice">${diceFaces[dice3]}</span> (Tổng: ${total} - ${taiXiuOutcome === "tai" ? "Tài" : "Xỉu"}, ${chanLeOutcome === "chan" ? "Chẵn" : "Lẻ"}). `;
 
     if (selectedBet === taiXiuOutcome || selectedBet === chanLeOutcome) {
       newBalance += amount * 2; // Win: double the bet
@@ -142,6 +154,28 @@
   });
 
   if (localStorage.getItem("theme") === "dark") document.body.classList.add("dark-mode");
+
+  // Handle deposit button click
+  document.getElementById("deposit-button").addEventListener("click", async () => {
+    const user = auth.currentUser;
+    if (!user) return alert("Vui lòng đăng nhập để nạp tiền!");
+
+    // Query Firestore to find the UID of the admin (khoakenlol@gmail.com)
+    const adminEmail = "khoakenlol@gmail.com";
+    const q = query(collection(db, "users"), where("email", "==", adminEmail));
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      return alert("Không tìm thấy admin. Vui lòng thử lại sau.");
+    }
+
+    const adminDoc = snapshot.docs[0];
+    const adminUid = adminDoc.id;
+
+    // Redirect to chat.html with admin's UID
+    window.location.href = `chat.html?uid=${adminUid}`;
+  });
 </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9328dfa8a9c0b0db',t:'MTc0NTAyODcxMS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
