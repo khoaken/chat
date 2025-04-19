@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>KKChat Professional</title>
+  <title>KKChat - Trò chuyện</title>
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="ChatUp" />
@@ -13,398 +13,653 @@
   <link rel="apple-touch-icon" href="/icon-192.png">
   <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png">
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/emoji-mart@latest/css/emoji-mart.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/emoji-picker-element@1.12.0/index.css" rel="stylesheet">
   <style>
-    .message { transition: all 0.2s ease; }
-    .message:hover { transform: translateY(-2px); }
-    .reaction { cursor: pointer; margin-right: 4px; }
-    .typing-indicator { font-size: 12px; color: #666; }
-    .dark-mode { background: #1a202c; color: #e2e8f0; }
-    .dark-mode .message.mine { background: #2d3748; color: #e2e8f0; }
-    .dark-mode .message.theirs { background: #4a5568; color: #e2e8f0; }
-    .dark-mode #chat-input-area { background: #2d3748; border-top: 1px solid #4a5568; }
-    .dark-mode #chat-input { background: #4a5568; border-color: #718096; color: #e2e8f0; }
-    .emoji-picker { position: absolute; bottom: 70px; left: 10px; }
-    .message.mine { margin-left: auto; border-bottom-right-radius: 0; }
-    .message.theirs { margin-right: auto; border-bottom-left-radius: 0; }
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background: url('https://www.transparenttextures.com/patterns/cute-pattern.png') repeat, #f0f4f8;
+      background-size: 200px;
+      min-height: 100vh;
+      margin: 0;
+      padding: 0;
+    }
+    .chat-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 15px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      height: calc(100vh - 40px);
+      display: flex;
+      flex-direction: column;
+    }
+    .chat-header {
+      padding: 15px;
+      background: #4a90e2;
+      color: white;
+      border-radius: 10px 10px 0 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .chat-messages {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .pinned-message {
+      background: #fefcbf;
+      padding: 10px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .pinned-message .message-content {
+      max-width: 80%;
+    }
+    .message {
+      max-width: 70%;
+      padding: 10px 15px;
+      border-radius: 15px;
+      line-height: 1.5;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      animation: fadeIn 0.3s ease-in;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .message.sent {
+      background: #4a90e2;
+      color: white;
+      align-self: flex-end;
+      border-bottom-right-radius: 5px;
+    }
+    .message.received {
+      background: #e2e8f0;
+      color: #1a202c;
+      align-self: flex-start;
+      border-bottom-left-radius: 5px;
+    }
+    .message img {
+      max-width: 200px;
+      border-radius: 10px;
+      margin-top: 5px;
+    }
+    .message-time {
+      font-size: 0.75rem;
+      color: #718096;
+      margin-top: 5px;
+      text-align: right;
+    }
+    .message.received .message-time {
+      text-align: left;
+    }
+    .message.no-time .message-time {
+      display: none;
+    }
+    .date-divider {
+      text-align: center;
+      color: #718096;
+      font-size: 0.85rem;
+      margin: 10px 0;
+    }
+    .message-actions {
+      display: none;
+      position: absolute;
+      top: -30px;
+      right: 10px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      z-index: 10;
+    }
+    .message:hover .message-actions {
+      display: block;
+    }
+    .message-actions button {
+      display: block;
+      padding: 5px 10px;
+      background: none;
+      border: none;
+      color: #1a202c;
+      cursor: pointer;
+    }
+    .message-actions button:hover {
+      background: #e2e8f0;
+    }
+    .reaction-picker {
+      display: none;
+      position: absolute;
+      top: -50px;
+      left: 10px;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      z-index: 10;
+    }
+    .message:hover .reaction-picker {
+      display: flex;
+      gap: 5px;
+    }
+    .reaction-picker button {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+    .reactions {
+      display: flex;
+      gap: 5px;
+      margin-top: 5px;
+      font-size: 0.9rem;
+    }
+    .reaction {
+      background: #e2e8f0;
+      border-radius: 10px;
+      padding: 2px 8px;
+    }
+    .message.sent .reaction {
+      background: #a3bffa;
+    }
+    .read-receipt {
+      font-size: 0.8rem;
+      color: #48bb78;
+      margin-top: 2px;
+      text-align: right;
+    }
+    .message.received .read-receipt {
+      text-align: left;
+    }
+    .chat-input {
+      display: flex;
+      gap: 10px;
+      padding: 15px;
+      background: #fff;
+      border-top: 1px solid #e2e8f0;
+      border-radius: 0 0 10px 10px;
+      position: relative;
+    }
+    .chat-input input {
+      flex: 1;
+      padding: 10px;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      outline: none;
+      font-size: 1rem;
+    }
+    .chat-input button {
+      background: #4a90e2;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .chat-input button:hover {
+      background: #3578c6;
+    }
+    .emoji-button, .image-upload-button {
+      background: none;
+      border: none;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+    emoji-picker {
+      position: absolute;
+      bottom: 60px;
+      left: 20px;
+      z-index: 10;
+      display: none;
+    }
+    #image-upload {
+      display: none;
+    }
+    .typing-indicator {
+      font-size: 0.85rem;
+      color: #718096;
+      padding: 10px 20px;
+      display: none;
+    }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #e53e3e;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      z-index: 100;
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+    .dark-mode {
+      background: url('https://www.transparenttextures.com/patterns/cute-pattern.png') repeat, #1a202c;
+      color: #e2e8f0;
+    }
+    .dark-mode .chat-container {
+      background: rgba(45, 55, 72, 0.9);
+    }
+    .dark-mode .chat-header {
+      background: #2b6cb0;
+    }
+    .dark-mode .message.received {
+      background: #4a5568;
+      color: #e2e8f0;
+    }
+    .dark-mode .pinned-message {
+      background: #4a5568;
+    }
+    .dark-mode .chat-input {
+      background: #2d3748;
+      border-top: 1px solid #4a5568;
+    }
+    .dark-mode .chat-input input {
+      background: #4a5568;
+      border-color: #718096;
+      color: #e2e8f0;
+    }
+    .dark-mode .message-actions, .dark-mode .reaction-picker {
+      background: #2d3748;
+      border-color: #4a5568;
+    }
+    .dark-mode .message-actions button:hover, .dark-mode .reaction-picker button:hover {
+      background: #4a5568;
+    }
+    .dark-mode .reaction {
+      background: #4a5568;
+    }
+    .dark-mode .message.sent .reaction {
+      background: #2b6cb0;
+    }
+    .profile-pic {
+      object-fit: cover;
+      border: 2px solid #4a90e2;
+    }
+    @media (max-width: 640px) {
+      .chat-container {
+        padding: 10px;
+        height: 100vh;
+      }
+      .message {
+        max-width: 85%;
+      }
+      .chat-input {
+        padding: 10px;
+      }
+    }
   </style>
 </head>
 <body class="bg-gray-100">
-  <div id="chat-container" class="flex flex-col h-screen">
-    <div id="chat-header" class="bg-blue-600 text-white p-4 flex items-center shadow-md">
-      <span id="chat-title" class="flex-1 text-lg font-semibold">Đang chat với ...</span>
-      <button id="view-profile-button" class="mr-2 bg-transparent border-none text-xl">👤</button>
-      <button id="voice-call-button" class="mr-2 bg-transparent border-none text-xl">📞</button>
-      <button id="video-call-button" class="mr-2 bg-transparent border-none text-xl">🎥</button>
-      <button id="dark-toggle" class="bg-transparent border-none text-xl">🌙</button>
+  <div class="chat-container">
+    <div class="chat-header">
+      <div class="flex items-center gap-3">
+        <img id="friend-pic" src="https://via.placeholder.com/40" alt="Friend Avatar" class="w-10 h-10 rounded-full profile-pic">
+        <h2 id="friend-name" class="text-lg font-semibold"></h2>
+      </div>
+      <button id="back-button" class="bg-transparent text-white text-xl border-none">←</button>
     </div>
-    <div id="pinned-message" class="bg-yellow-100 text-gray-800 p-2 hidden">📌 Tin nhắn ghim</div>
-    <div id="typing-status" class="typing-indicator px-4"></div>
-    <div id="chat-messages" class="flex-1 overflow-y-auto p-4 flex flex-col gap-2"></div>
-    <div id="chat-input-area" class="flex p-4 bg-white border-t border-gray-200 items-center">
-      <input type="file" id="file-input" accept="image/*,video/*,audio/*" class="hidden" />
-      <button id="emoji-button" class="mr-2 text-xl">😊</button>
-      <button id="upload-button" class="mr-2 bg-blue-600 text-white px-3 py-1 rounded">📎</button>
-      <button id="voice-button" class="mr-2 bg-blue-600 text-white px-3 py-1 rounded">🎤</button>
-      <input type="text" id="chat-input" placeholder="Nhập tin nhắn..." class="flex-1 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600">
-      <button id="send-button" class="ml-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Gửi</button>
+    <div id="pinned-message" class="pinned-message hidden"></div>
+    <div class="chat-messages" id="messages">
+      <!-- Messages will be dynamically added here -->
+    </div>
+    <div class="typing-indicator" id="typing-indicator">Đang gõ...</div>
+    <div class="chat-input">
+      <button class="emoji-button" id="emoji-button">😊</button>
+      <emoji-picker id="emoji-picker"></emoji-picker>
+      <button class="image-upload-button" id="image-upload-button">📷</button>
+      <input type="file" accept="image/*" id="image-upload">
+      <input type="text" id="message-input" placeholder="Nhập tin nhắn...">
+      <button id="send-button">Gửi</button>
     </div>
   </div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, setDoc, doc, getDoc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
-import { Picker } from "https://cdn.jsdelivr.net/npm/emoji-mart@latest/+esm";
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+    import { getFirestore, collection, doc, getDoc, setDoc, updateDoc, onSnapshot, addDoc, deleteDoc, serverTimestamp, query, orderBy, arrayUnion } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-storage.js";
+    import 'https://cdn.jsdelivr.net/npm/emoji-picker-element@1.12.0/index.js';
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
-  authDomain: "chatup-7fed7.firebaseapp.com",
-  projectId: "chatup-7fed7",
-  storageBucket: "chatup-7fed7.appspot.com",
-  messagingSenderId: "287838782402",
-  appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
-};
+    const firebaseConfig = {
+      apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
+      authDomain: "chatup-7fed7.firebaseapp.com",
+      projectId: "chatup-7fed7",
+      storageBucket: "chatup-7fed7.appspot.com",
+      messagingSenderId: "287838782402",
+      appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
+    };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-const storage = getStorage(app);
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+    let lastMessageDate = null;
+    let lastSenderId = null;
+    let lastSentMessageId = null;
 
-let currentChatId = null;
-let currentChatPartner = null;
-let currentUser = null;
+    function getChatId(userId1, userId2) {
+      return [userId1, userId2].sort().join('_');
+    }
 
-async function renderMessage(msg, id) {
-  const div = document.createElement('div');
-  div.className = `message ${msg.sender === currentUser.uid ? 'mine bg-blue-100' : 'theirs bg-white'} max-w-[70%] p-3 rounded-lg shadow-sm`;
-  const date = msg.createdAt.toDate();
-  const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const dateStr = date.toLocaleDateString();
-  let content = msg.text;
-  if (msg.isImage) content = `<img src="${msg.text}" style="max-width: 200px; border-radius: 8px;" />`;
-  if (msg.isVideo) content = `<video controls src="${msg.text}" style="max-width: 200px; border-radius: 8px;"></video>`;
-  if (msg.isAudio) content = `<audio controls src="${msg.text}" style="max-width: 200px;"></audio>`;
+    function formatTime(timestamp) {
+      if (!timestamp) return '';
+      const date = timestamp.toDate();
+      return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    }
 
-  const senderData = (await getDoc(doc(db, "users", msg.sender))).data();
-  const senderName = senderData.name || "Người dùng";
-  const isVerified = senderData.isVerified || false;
+    function formatDate(timestamp) {
+      if (!timestamp) return '';
+      const date = timestamp.toDate();
+      return date.toLocaleDateString('vi-VN', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
 
-  div.innerHTML = `
-    <div class="flex items-center gap-2">
-      <span class="font-semibold">${senderName}${isVerified ? " ✅" : ""}</span>
-    </div>
-    <div>${content}</div>
-    <div class="timestamp text-xs text-gray-500 mt-1 text-right">${dateStr} ${timeStr}</div>
-    <div class="reactions flex gap-1 mt-1">${renderReactions(msg.reactions || {})}</div>
-  `;
+    function showToast(message) {
+      const toast = document.createElement("div");
+      toast.className = "toast";
+      toast.innerText = message;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
 
-  if (msg.sender === currentUser.uid) {
-    div.addEventListener('contextmenu', async (e) => {
-      e.preventDefault();
-      if (confirm("Thu hồi tin nhắn này?")) {
-        await deleteDoc(doc(db, "chats", currentChatId, "messages", id));
+    async function loadFriendInfo(friendId) {
+      const friendRef = doc(db, "users", friendId);
+      const friendSnap = await getDoc(friendRef);
+      if (friendSnap.exists()) {
+        const friendData = friendSnap.data();
+        document.getElementById("friend-name").innerText = friendData.name || "Người dùng";
+        document.getElementById("friend-name").innerHTML += friendData.isVerified ? " ✅" : "";
+        document.getElementById("friend-pic").src = friendData.profilePic || "https://via.placeholder.com/40";
       }
-    });
-    let pressTimer;
-    div.addEventListener('touchstart', () => {
-      pressTimer = setTimeout(async () => {
-        if (confirm("Thu hồi tin nhắn này?")) {
-          await deleteDoc(doc(db, "chats", currentChatId, "messages", id));
+    }
+
+    async function loadPinnedMessage(chatId, userId) {
+      const chatRef = doc(db, "chats", chatId);
+      const chatSnap = await getDoc(chatRef);
+      const pinnedMessageId = chatSnap.data()?.pinnedMessageId;
+      const pinnedMessageDiv = document.getElementById("pinned-message");
+      if (pinnedMessageId) {
+        const msgRef = doc(db, "chats", chatId, "messages", pinnedMessageId);
+        const msgSnap = await getDoc(msgRef);
+        if (msgSnap.exists()) {
+          const msg = msgSnap.data();
+          pinnedMessageDiv.className = "pinned-message";
+          let content = `<div class="message-content">${msg.text || ""}`;
+          if (msg.imageUrl) {
+            content += `<img src="${msg.imageUrl}" alt="Pinned image">`;
+          }
+          content += `</div>`;
+          content += `<button class="unpin-button" data-msg-id="${msgSnap.id}">Bỏ ghim</button>`;
+          pinnedMessageDiv.innerHTML = content;
+          pinnedMessageDiv.classList.remove("hidden");
+
+          pinnedMessageDiv.querySelector(".unpin-button").addEventListener("click", async () => {
+            await updateDoc(chatRef, { pinnedMessageId: null });
+            pinnedMessageDiv.classList.add("hidden");
+            pinnedMessageDiv.innerHTML = "";
+          });
         }
-      }, 600);
-    });
-    div.addEventListener('touchend', () => clearTimeout(pressTimer));
-  }
+      } else {
+        pinnedMessageDiv.classList.add("hidden");
+      }
+    }
 
-  div.addEventListener('dblclick', () => {
-    const pinnedMessage = document.getElementById('pinned-message');
-    pinnedMessage.style.display = 'block';
-    pinnedMessage.innerText = '📌 ' + (msg.text.startsWith('<') ? '[Media]' : msg.text);
-  });
+    function loadMessages(userId, friendId) {
+      const chatId = getChatId(userId, friendId);
+      const messagesRef = collection(db, "chats", chatId, "messages");
+      const q = query(messagesRef, orderBy("timestamp", "asc"));
+      let messages = [];
+      onSnapshot(q, (snapshot) => {
+        messages = [];
+        snapshot.forEach((doc) => {
+          messages.push({ id: doc.id, ...doc.data() });
+        });
 
-  div.querySelectorAll('.reaction').forEach(reaction => {
-    reaction.addEventListener('click', async () => {
-      const emoji = reaction.textContent;
-      const reactions = msg.reactions || {};
-      reactions[currentUser.uid] = emoji;
-      await updateDoc(doc(db, "chats", currentChatId, "messages", id), { reactions });
-    });
-  });
+        const messagesDiv = document.getElementById("messages");
+        messagesDiv.innerHTML = "";
+        lastMessageDate = null;
+        lastSenderId = null;
 
-  return div;
-}
+        const lastSentMessage = messages
+          .filter(msg => msg.senderId === userId)
+          .slice(-1)[0];
 
-function renderReactions(reactions) {
-  const reactionCounts = {};
-  Object.values(reactions).forEach(emoji => {
-    reactionCounts[emoji] = (reactionCounts[emoji] || 0) + 1;
-  });
-  return Object.entries(reactionCounts).map(([emoji, count]) => `<span class="reaction">${emoji}${count > 1 ? count : ''}</span>`).join('');
-}
+        messages.forEach((msg, index) => {
+          const msgDate = msg.timestamp ? formatDate(msg.timestamp) : '';
+          if (msgDate && msgDate !== lastMessageDate) {
+            lastMessageDate = msgDate;
+            const divider = document.createElement("div");
+            divider.className = "date-divider";
+            divider.innerText = msgDate;
+            messagesDiv.appendChild(divider);
+          }
+          const messageDiv = document.createElement("div");
+          const isSameSender = lastSenderId === msg.senderId;
+          lastSenderId = msg.senderId;
+          messageDiv.className = `message ${msg.senderId === userId ? "sent" : "received"} ${isSameSender ? "no-time" : ""}`;
+          messageDiv.dataset.msgId = msg.id;
+          let content = `<div>${msg.text || ""}</div>`;
+          if (msg.imageUrl) {
+            content += `<img src="${msg.imageUrl}" alt="Attached image">`;
+          }
+          content += `<div class="message-time">${formatTime(msg.timestamp)}</div>`;
+          if (msg.senderId === userId && msg.id === lastSentMessage?.id && msg.readBy?.includes(friendId)) {
+            content += `<div class="read-receipt">Đã đọc ✅</div>`;
+          }
+          if (msg.reactions) {
+            content += `<div class="reactions">`;
+            Object.entries(msg.reactions).forEach(([emoji, users]) => {
+              content += `<span class="reaction">${emoji} ${users.length}</span>`;
+            });
+            content += `</div>`;
+          }
+          if (msg.senderId === userId) {
+            content += `
+              <div class="message-actions">
+                <button class="pin-button" data-msg-id="${msg.id}">Ghim</button>
+                <button class="recall-button" data-msg-id="${msg.id}">Thu hồi</button>
+              </div>
+            `;
+          }
+          content += `
+            <div class="reaction-picker">
+              <button class="react-button" data-emoji="❤️">❤️</button>
+              <button class="react-button" data-emoji="😂">😂</button>
+              <button class="react-button" data-emoji="👍">👍</button>
+              <button class="react-button" data-emoji="😮">😮</button>
+            </div>
+          `;
+          messageDiv.innerHTML = content;
+          messagesDiv.appendChild(messageDiv);
 
-async function setupChat(friendId, friendName) {
-  const partnerData = (await getDoc(doc(db, "users", friendId))).data();
-  document.getElementById("chat-title").innerText = `Đang chat với ${friendName}${partnerData.isVerified ? " ✅" : ""}`;
-  const chatId = [currentUser.uid, friendId].sort().join('_');
-  currentChatId = chatId;
-  const chatRef = collection(db, "chats", chatId, "messages");
-  const q = query(chatRef, orderBy("createdAt"));
+          if (msg.senderId === userId) {
+            messageDiv.querySelector(".pin-button")?.addEventListener("click", async () => {
+              const chatRef = doc(db, "chats", chatId);
+              await updateDoc(chatRef, { pinnedMessageId: msg.id });
+              loadPinnedMessage(chatId, userId);
+            });
+            messageDiv.querySelector(".recall-button")?.addEventListener("click", async () => {
+              await deleteDoc(doc(db, "chats", chatId, "messages", msg.id));
+              const chatRef = doc(db, "chats", chatId);
+              const chatSnap = await getDoc(chatRef);
+              if (chatSnap.data()?.pinnedMessageId === msg.id) {
+                await updateDoc(chatRef, { pinnedMessageId: null });
+              }
+            });
+          }
+          messageDiv.querySelectorAll(".react-button").forEach(button => {
+            button.addEventListener("click", async () => {
+              const emoji = button.dataset.emoji;
+              const msgRef = doc(db, "chats", chatId, "messages", msg.id);
+              await updateDoc(msgRef, {
+                [`reactions.${emoji}`]: arrayUnion(userId)
+              });
+            });
+          });
 
-  onSnapshot(q, (snapshot) => {
-    const chatMessages = document.getElementById("chat-messages");
-    chatMessages.innerHTML = '';
-    snapshot.forEach(docSnap => {
-      const msg = docSnap.data();
-      chatMessages.appendChild(renderMessage(msg, docSnap.id));
-    });
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-  });
+          if (msg.senderId !== userId && !msg.readBy?.includes(userId)) {
+            updateDoc(doc(db, "chats", chatId, "messages", msg.id), {
+              readBy: arrayUnion(userId)
+            });
+          }
+        });
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        loadPinnedMessage(chatId, userId);
+      });
+    }
 
-  const typingRef = doc(db, "chats", currentChatId, "typing", currentUser.uid);
-  onSnapshot(collection(db, "chats", currentChatId, "typing"), (snapshot) => {
-    const typingUsers = [];
-    snapshot.forEach(doc => {
-      if (doc.id !== currentUser.uid && doc.data().isTyping) {
-        typingUsers.push(doc.id);
+    function setupTypingIndicator(userId, friendId) {
+      const chatId = getChatId(userId, friendId);
+      const typingRef = doc(db, "chats", chatId, "typing", friendId);
+      onSnapshot(typingRef, (doc) => {
+        const typingIndicator = document.getElementById("typing-indicator");
+        if (doc.exists() && doc.data().isTyping) {
+          typingIndicator.style.display = "block";
+        } else {
+          typingIndicator.style.display = "none";
+        }
+      });
+    }
+
+    document.getElementById("send-button").addEventListener("click", async () => {
+      const messageInput = document.getElementById("message-input");
+      const text = messageInput.value.trim();
+      if (!text) return;
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const friendId = urlParams.get("uid");
+      const userId = auth.currentUser.uid;
+      const chatId = getChatId(userId, friendId);
+
+      try {
+        await addDoc(collection(db, "chats", chatId, "messages"), {
+          senderId: userId,
+          text: text,
+          timestamp: serverTimestamp(),
+          readBy: [userId],
+          reactions: {}
+        });
+        messageInput.value = "";
+      } catch (error) {
+        showToast(`Lỗi khi gửi tin nhắn: ${error.message}`);
       }
     });
-    document.getElementById("typing-status").innerText = typingUsers.length ? `${friendName}${partnerData.isVerified ? " ✅" : ""} đang nhập...` : '';
-  });
 
-  document.getElementById("view-profile-button").onclick = () => {
-    window.location.href = `profile.html?uid=${friendId}`;
-  };
-}
+    document.getElementById("image-upload").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
 
-document.getElementById("send-button").addEventListener("click", async () => {
-  const input = document.getElementById("chat-input");
-  const text = input.value.trim();
-  if (!text || !currentChatId) return;
-  const chatRef = collection(db, "chats", currentChatId, "messages");
+      const urlParams = new URLSearchParams(window.location.search);
+      const friendId = urlParams.get("uid");
+      const userId = auth.currentUser.uid;
+      const chatId = getChatId(userId, friendId);
 
-  await addDoc(chatRef, {
-    sender: currentUser.uid,
-    text,
-    createdAt: new Date(),
-    reactions: {}
-  });
-
-  await setDoc(doc(db, "chats", currentChatId), {
-    participants: [currentUser.uid, currentChatPartner],
-    lastMessage: text,
-    updatedAt: new Date()
-  });
-
-  await setDoc(doc(db, "chats", currentChatId, "typing", currentUser.uid), { isTyping: false });
-  input.value = '';
-});
-
-document.getElementById("chat-input").addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
-    e.preventDefault();
-    document.getElementById("send-button").click();
-  }
-});
-
-document.getElementById("chat-input").addEventListener("input", async () => {
-  await setDoc(doc(db, "chats", currentChatId, "typing", currentUser.uid), { isTyping: true });
-  setTimeout(async () => {
-    await setDoc(doc(db, "chats", currentChatId, "typing", currentUser.uid), { isTyping: false });
-  }, 2000);
-});
-
-document.getElementById("upload-button").addEventListener("click", () => {
-  document.getElementById("file-input").click();
-});
-
-document.getElementById("file-input").addEventListener("change", async (event) => {
-  const file = event.target.files[0];
-  if (!file || !currentChatId) return;
-
-  const fileRef = ref(storage, `uploads/${currentChatId}/${Date.now()}_${file.name}`);
-  await uploadBytes(fileRef, file);
-  const fileURL = await getDownloadURL(fileRef);
-
-  const isImage = file.type.startsWith("image/");
-  const isVideo = file.type.startsWith("video/");
-  const isAudio = file.type.startsWith("audio/");
-
-  const chatRef = collection(db, "chats", currentChatId, "messages");
-  await addDoc(chatRef, {
-    sender: currentUser.uid,
-    text: fileURL,
-    isImage,
-    isVideo,
-    isAudio,
-    createdAt: new Date(),
-    reactions: {}
-  });
-
-  await setDoc(doc(db, "chats", currentChatId), {
-    participants: [currentUser.uid, currentChatPartner],
-    lastMessage: "[Đã gửi file]",
-    updatedAt: new Date()
-  });
-
-  event.target.value = "";
-});
-
-async function startCall(videoEnabled) {
-  localStream = await navigator.mediaDevices.getUserMedia({ video: videoEnabled, audio: true });
-  remoteStream = new MediaStream();
-  peerConnection = new RTCPeerConnection(servers);
-
-  localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
-
-  peerConnection.ontrack = event => {
-    event.streams[0].getTracks().forEach(track => remoteStream.addTrack(track));
-  };
-
-  const callDoc = doc(collection(db, "calls"));
-  const offerCandidates = collection(callDoc, "offerCandidates");
-  const answerCandidates = collection(callDoc, "answerCandidates");
-
-  peerConnection.onicecandidate = event => {
-    if (event.candidate) {
-      addDoc(offerCandidates, event.candidate.toJSON());
-    }
-  };
-
-  const offerDescription = await peerConnection.createOffer();
-  await peerConnection.setLocalDescription(offerDescription);
-
-  const offer = {
-    sdp: offerDescription.sdp,
-    type: offerDescription.type,
-  };
-
-  await setDoc(callDoc, { offer, from: currentUser.uid, to: currentChatPartner });
-
-  onSnapshot(callDoc, async (snapshot) => {
-    const data = snapshot.data();
-    if (!peerConnection.currentRemoteDescription && data?.answer) {
-      const answerDescription = new RTCSessionDescription(data.answer);
-      await peerConnection.setRemoteDescription(answerDescription);
-    }
-  });
-
-  onSnapshot(answerCandidates, (snapshot) => {
-    snapshot.docChanges().forEach(change => {
-      if (change.type === "added") {
-        const candidate = new RTCIceCandidate(change.doc.data());
-        peerConnection.addIceCandidate(candidate);
+      try {
+        const storageRef = ref(storage, `chat_images/${chatId}/${Date.now()}_${file.name}`);
+        await uploadBytes(storageRef, file);
+        const imageUrl = await getDownloadURL(storageRef);
+        await addDoc(collection(db, "chats", chatId, "messages"), {
+          senderId: userId,
+          text: "",
+          imageUrl: imageUrl,
+          timestamp: serverTimestamp(),
+          readBy: [userId],
+          reactions: {}
+        });
+        e.target.value = "";
+      } catch (error) {
+        showToast(`Lỗi khi tải ảnh lên: ${error.message}`);
       }
     });
-  });
 
-  openCallWindow(localStream, remoteStream);
-}
-
-function openCallWindow(local, remote) {
-  const callWindow = window.open("", "_blank", "width=800,height=600");
-  callWindow.document.write(`
-    <style>
-      body { margin: 0; background: #1a202c; color: white; font-family: sans-serif; }
-      video { border-radius: 8px; }
-    </style>
-    <h2 class="p-4">Đang gọi...</h2>
-    <div style="display: flex; gap: 10px; padding: 10px;">
-      <video id="localVideo" autoplay muted playsinline style="width: 48%;"></video>
-      <video id="remoteVideo" autoplay playsinline style="width: 48%;"></video>
-    </div>
-  `);
-  const localVideo = callWindow.document.getElementById("localVideo");
-  const remoteVideo = callWindow.document.getElementById("remoteVideo");
-  localVideo.srcObject = local;
-  remoteVideo.srcObject = remote;
-}
-
-document.getElementById("voice-call-button").addEventListener("click", () => startCall(false));
-document.getElementById("video-call-button").addEventListener("click", () => startCall(true));
-
-document.getElementById("dark-toggle").addEventListener("click", () => {
-  document.body.classList.toggle("dark-mode");
-  localStorage.setItem("theme", document.body.classList.contains("dark-mode") ? "dark" : "light");
-});
-
-if (localStorage.getItem("theme") === "dark") document.body.classList.add("dark-mode");
-
-if ("Notification" in window && Notification.permission !== "granted") {
-  Notification.requestPermission();
-}
-
-const emojiPicker = new Picker({
-  data: async () => (await import("https://cdn.jsdelivr.net/npm/@emoji-mart/data@latest/+esm")).default,
-  onEmojiSelect: async (emoji) => {
-    const input = document.getElementById("chat-input");
-    input.value += emoji.native;
-    input.focus();
-    await setDoc(doc(db, "chats", currentChatId, "typing", currentUser.uid), { isTyping: true });
-  }
-});
-document.getElementById("emoji-button").addEventListener("click", () => {
-  const pickerContainer = document.createElement("div");
-  pickerContainer.className = "emoji-picker";
-  pickerContainer.appendChild(emojiPicker);
-  document.getElementById("chat-input-area").appendChild(pickerContainer);
-  setTimeout(() => pickerContainer.remove(), 5000);
-});
-
-document.getElementById("voice-button").addEventListener("click", async () => {
-  if (!navigator.mediaDevices || !window.MediaRecorder) return alert("Trình duyệt không hỗ trợ ghi âm.");
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  const recorder = new MediaRecorder(stream);
-  const chunks = [];
-
-  recorder.ondataavailable = e => chunks.push(e.data);
-  recorder.onstop = async () => {
-    const blob = new Blob(chunks, { type: "audio/webm" });
-    const fileRef = ref(storage, `uploads/${currentChatId}/${Date.now()}_voice.webm`);
-    await uploadBytes(fileRef, blob);
-    const fileURL = await getDownloadURL(fileRef);
-
-    const chatRef = collection(db, "chats", currentChatId, "messages");
-    await addDoc(chatRef, {
-      sender: currentUser.uid,
-      text: fileURL,
-      isAudio: true,
-      createdAt: new Date(),
-      reactions: {}
+    document.getElementById("image-upload-button").addEventListener("click", () => {
+      document.getElementById("image-upload").click();
     });
 
-    await setDoc(doc(db, "chats", currentChatId), {
-      participants: [currentUser.uid, currentChatPartner],
-      lastMessage: "[Tin nhắn thoại]",
-      updatedAt: new Date()
+    document.getElementById("message-input").addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        document.getElementById("send-button").click();
+      }
     });
-  };
 
-  recorder.start();
-  document.getElementById("voice-button").innerText = "⏹️";
-  setTimeout(() => {
-    recorder.stop();
-    document.getElementById("voice-button").innerText = "🎤";
-  }, 10000);
-});
+    document.getElementById("message-input").addEventListener("input", async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const friendId = urlParams.get("uid");
+      const userId = auth.currentUser.uid;
+      const chatId = getChatId(userId, friendId);
+      const typingRef = doc(db, "chats", chatId, "typing", userId);
+      await setDoc(typingRef, { isTyping: true });
+      setTimeout(async () => {
+        await setDoc(typingRef, { isTyping: false });
+      }, 3000);
+    });
 
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") document.title = "KKChat Professional";
-});
+    document.getElementById("emoji-button").addEventListener("click", () => {
+      const picker = document.getElementById("emoji-picker");
+      picker.style.display = picker.style.display === "block" ? "none" : "block";
+    });
 
-onAuthStateChanged(auth, async (user) => {
-  if (!user) return;
-  currentUser = user;
-  const urlParams = new URLSearchParams(window.location.search);
-  const partnerId = urlParams.get("uid");
-  if (!partnerId) return;
-  currentChatPartner = partnerId;
-  const partnerSnap = await getDoc(doc(db, "users", partnerId));
-  const partnerData = partnerSnap.data();
-  setupChat(partnerId, partnerData.name);
-});
-</script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932c0e109f32afb6',t:'MTc0NTA2MjA2OS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+    document.getElementById("emoji-picker").addEventListener("emoji-click", (event) => {
+      const messageInput = document.getElementById("message-input");
+      messageInput.value += event.detail.unicode;
+      messageInput.focus();
+      document.getElementById("emoji-picker").style.display = "none";
+    });
+
+    document.getElementById("back-button").addEventListener("click", () => {
+      window.location.href = "index.html";
+    });
+
+    if (localStorage.getItem("theme") === "dark") {
+      document.body.classList.add("dark-mode");
+    }
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        window.location.href = "login.html";
+        return;
+      }
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const friendId = urlParams.get("uid");
+      if (!friendId) {
+        showToast("Không tìm thấy người dùng để trò chuyện!");
+        window.location.href = "index.html";
+        return;
+      }
+
+      try {
+        await loadFriendInfo(friendId);
+        loadMessages(user.uid, friendId);
+        setupTypingIndicator(user.uid, friendId);
+        const chatId = getChatId(user.uid, friendId);
+        const chatRef = doc(db, "chats", chatId);
+        const chatSnap = await getDoc(chatRef);
+        if (!chatSnap.exists()) {
+          await setDoc(chatRef, { pinnedMessageId: null });
+        }
+      } catch (error) {
+        showToast(`Lỗi khi tải cuộc trò chuyện: ${error.message}`);
+        window.location.href = "index.html";
+      }
+    });
+  </script>
 </body>
 </html>
