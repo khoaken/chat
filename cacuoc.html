@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Game Cá Cược - ChatUp</title>
+  <meta name="theme-color" content="#4a90e2" />
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Montserrat', sans-serif; }
+    .dark-mode { background: #1a202c; color: #e2e8f0; }
+    .dark-mode .bg-white { background: #2d3748; }
+    .dark-mode .bg-gray-100 { background: #1a202c; }
+    .dark-mode .border-gray-200 { border-color: #4a5568; }
+    .dark-mode input, .dark-mode button { background: #4a5568; color: #e2e8f0; border-color: #718096; }
+    .bet-button { transition: all 0.2s ease; }
+    .bet-button:hover { background: #2b6cb0; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+  <div class="max-w-4xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-semibold text-blue-600">Game Cá Cược</h2>
+      <div class="flex items-center gap-4">
+        <button id="dark-toggle" class="text-xl bg-transparent border-none">🌙</button>
+        <button onclick="window.location.href='index.html'" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Quay lại</button>
+      </div>
+    </div>
+
+    <div id="game-ui" class="bg-white p-6 rounded-lg shadow-md">
+      <p class="text-lg mb-4">Số dư: <span id="balance" class="font-semibold">0</span> xu</p>
+      <h3 class="text-lg font-semibold mb-4">Đoán số (1-10)</h3>
+      <input id="bet-number" type="number" min="1" max="10" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Chọn số (1-10)">
+      <input id="bet-amount" type="number" min="10" step="10" class="w-full p-2 mb-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Số xu cược (tối thiểu 10)">
+      <button onclick="placeBet()" class="bet-button w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700">Đặt cược</button>
+      <div id="bet-result" class="mt-4"></div>
+    </div>
+  </div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+  import { getFirestore, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
+    authDomain: "chatup-7fed7.firebaseapp.com",
+    projectId: "chatup-7fed7",
+    storageBucket: "chatup-7fed7.appspot.com",
+    messagingSenderId: "287838782402",
+    appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  async function loadBalance(uid) {
+    const userDoc = await getDoc(doc(db, "users", uid));
+    const balance = userDoc.data().balance || 0;
+    document.getElementById("balance").innerText = balance;
+    return balance;
+  }
+
+  window.placeBet = async function() {
+    const user = auth.currentUser;
+    if (!user) return alert("Vui lòng đăng nhập để chơi!");
+
+    const number = parseInt(document.getElementById("bet-number").value);
+    const amount = parseInt(document.getElementById("bet-amount").value);
+    const resultDiv = document.getElementById("bet-result");
+
+    if (!number || number < 1 || number > 10) return alert("Vui lòng chọn số từ 1 đến 10.");
+    if (!amount || amount < 10 || amount % 10 !== 0) return alert("Số xu cược phải lớn hơn hoặc bằng 10 và là bội số của 10.");
+
+    const balance = await loadBalance(user.uid);
+    if (amount > balance) return alert("Số dư không đủ!");
+
+    const randomNumber = Math.floor(Math.random() * 10) + 1;
+    let newBalance = balance;
+    let message = `Kết quả: ${randomNumber}. `;
+
+    if (number === randomNumber) {
+      newBalance += amount * 2; // Win: double the bet
+      message += `Bạn thắng! Nhận được ${amount * 2} xu.`;
+    } else {
+      newBalance -= amount; // Lose: deduct the bet
+      message += `Bạn thua! Mất ${amount} xu.`;
+    }
+
+    await updateDoc(doc(db, "users", user.uid), { balance: newBalance });
+    document.getElementById("balance").innerText = newBalance;
+    resultDiv.innerHTML = `<p class="text-lg">${message}</p>`;
+  }
+
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      await loadBalance(user.uid);
+    } else {
+      window.location.href = "index.html"; // Redirect to login if not authenticated
+    }
+  });
+
+  document.getElementById("dark-toggle").addEventListener("click", () => {
+    document.body.classList.toggle("dark-mode");
+    localStorage.setItem("theme", document.body.classList.contains("dark-mode") ? "dark" : "light");
+  });
+
+  if (localStorage.getItem("theme") === "dark") document.body.classList.add("dark-mode");
+</script>
+</body>
+</html>
