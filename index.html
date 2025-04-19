@@ -23,7 +23,25 @@
     .dark-mode input, .dark-mode button { background: #4a5568; color: #e2e8f0; border-color: #718096; }
     .friend-item { transition: all 0.2s ease; }
     .friend-item:hover { transform: translateY(-2px); }
-    .profile-pic { object-fit: cover; border: 2px solid #4a90e2; }
+    .avatar-initial {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #4a90e2;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 1.2rem;
+      text-transform: uppercase;
+      border: 2px solid #3578c6;
+    }
+    .avatar-initial-large {
+      width: 100px;
+      height: 100px;
+      font-size: 2.5rem;
+    }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-6">
@@ -39,7 +57,7 @@
     <div class="bg-white p-6 rounded-lg shadow-md mb-6">
       <h2 class="text-xl font-semibold mb-4">Thông tin người dùng</h2>
       <div class="flex items-center gap-6 mb-4">
-        <img id="user-pic" src="https://via.placeholder.com/100" alt="Avatar" class="w-24 h-24 rounded-full profile-pic">
+        <div id="user-pic" class="avatar-initial avatar-initial-large"></div>
         <div>
           <h3 id="user-name" class="text-lg font-semibold"></h3>
           <p id="user-coins" class="text-gray-600"></p>
@@ -111,9 +129,9 @@ const ADMIN_EMAIL = "khoakenlol@gmail.com";
 function loadUserInfo(userData) {
   document.getElementById("user-name").innerText = userData.name || "Người dùng";
   document.getElementById("user-name").innerHTML += userData.isVerified ? " ✅" : "";
-  document.getElementById("user-coins").innerText = `Xu: ${userData.coins || 0}`;
+  document.getElementById("user-coins").innerText = `Xu: ${userData.balance || 0}`;
   const userPic = document.getElementById("user-pic");
-  userPic.src = userData.profilePic || "https://via.placeholder.com/100";
+  userPic.innerText = userData.name ? userData.name.charAt(0).toUpperCase() : "U";
 }
 
 function loadFriends(uid) {
@@ -128,7 +146,10 @@ function loadFriends(uid) {
       const div = document.createElement("div");
       div.className = "friend-item bg-gray-50 p-3 rounded-lg flex justify-between items-center mb-2";
       div.innerHTML = `
-        <span class="font-semibold">${data?.name || "Người dùng"} ${data?.isVerified ? "✅" : ""}</span>
+        <div class="flex items-center gap-3">
+          <div class="avatar-initial">${data?.name ? data.name.charAt(0).toUpperCase() : "U"}</div>
+          <span class="font-semibold">${data?.name || "Người dùng"} ${data?.isVerified ? "✅" : ""}</span>
+        </div>
         <div class="flex gap-2">
           <button onclick="window.location.href='profile.html?uid=${friendId}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
           <button onclick="window.location.href='chat.html?uid=${friendId}'" class="bg-blue-600 text-white px-3 py-1 rounded-lg hover:bg-blue-700">Nhắn tin</button>
@@ -208,8 +229,8 @@ document.getElementById("admin-give-coins").addEventListener("click", async () =
 
     const userRef = doc(db, "users", targetUid);
     const userDoc = await getDoc(userRef);
-    const currentCoins = userDoc.data().coins || 0;
-    await updateDoc(userRef, { coins: currentCoins + coins });
+    const currentBalance = userDoc.data().balance || 0;
+    await updateDoc(userRef, { balance: currentBalance + coins });
     alert(`Cấp ${coins} xu cho ${email} thành công!`);
     document.getElementById("admin-email").value = "";
     document.getElementById("admin-coins").value = "";
@@ -243,13 +264,13 @@ document.getElementById("admin-withdraw-coins").addEventListener("click", async 
 
     const userRef = doc(db, "users", targetUid);
     const userDoc = await getDoc(userRef);
-    const currentCoins = userDoc.data().coins || 0;
-    if (currentCoins < coins) {
-      alert(`Số xu hiện tại (${currentCoins}) không đủ để rút ${coins} xu!`);
+    const currentBalance = userDoc.data().balance || 0;
+    if (currentBalance < coins) {
+      alert(`Số xu hiện tại (${currentBalance}) không đủ để rút ${coins} xu!`);
       return;
     }
 
-    await updateDoc(userRef, { coins: currentCoins - coins });
+    await updateDoc(userRef, { balance: currentBalance - coins });
     alert(`Rút ${coins} xu từ ${email} thành công!`);
     document.getElementById("admin-withdraw-email").value = "";
     document.getElementById("admin-withdraw-coins").value = "";
@@ -367,13 +388,20 @@ onAuthStateChanged(auth, async (user) => {
       await setDoc(userRef, {
         name: user.displayName || "Người dùng",
         email: user.email,
-        coins: 0,
+        balance: 0,
         isVerified: false
       });
     }
     const userData = userSnap.exists() ? userSnap.data() : (await getDoc(userRef)).data();
     loadUserInfo(userData);
     loadFriends(user.uid);
+
+    // Listen for real-time updates to user data
+    onSnapshot(userRef, (doc) => {
+      if (doc.exists()) {
+        loadUserInfo(doc.data());
+      }
+    });
 
     if (user.email === ADMIN_EMAIL) {
       document.getElementById("admin-section").classList.remove("hidden");
@@ -384,6 +412,5 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932c0e111e5a4564',t:'MTc0NTA2MjA3MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932d5efc9fd9bd16',t:'MTc0NTA3NTg3MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
