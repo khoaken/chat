@@ -111,16 +111,13 @@
     <div id="admin-section" class="bg-white p-6 rounded-lg shadow-md mb-6 hidden">
       <h2 class="text-xl font-semibold mb-4">Quản lý Admin</h2>
       <div class="mb-4">
-        <label class="block text-sm font-medium mb-1">Cấp xu</label>
+        <label class="block text-sm font-medium mb-1">Quản lý xu</label>
         <input id="admin-email" type="email" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Email người dùng">
-        <input id="admin-coins" type="number" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Số xu">
-        <button id="admin-give-coins" class="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Cấp xu</button>
-      </div>
-      <div class="mb-4">
-        <label class="block text-sm font-medium mb-1">Rút xu</label>
-        <input id="admin-withdraw-email" type="email" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Email người dùng">
-        <input id="admin-withdraw-coins" type="number" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Số xu cần rút">
-        <button id="admin-withdraw-coins" class="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">Rút xu</button>
+        <input id="admin-coins" type="number" min="1" class="w-full p-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Số xu">
+        <div class="flex gap-2">
+          <button id="admin-add-coins" class="flex-1 bg-green-600 text-white py-2 rounded-lg hover:bg-green-700">Nạp xu</button>
+          <button id="admin-withdraw-coins" class="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700">Rút xu</button>
+        </div>
       </div>
       <div>
         <label class="block text-sm font-medium mb-1">Quản lý tích xanh</label>
@@ -249,11 +246,11 @@ document.getElementById("add-friend-button").addEventListener("click", async () 
   }
 });
 
-document.getElementById("admin-give-coins").addEventListener("click", async () => {
+document.getElementById("admin-add-coins").addEventListener("click", async () => {
   const email = document.getElementById("admin-email").value.trim();
   const coins = parseInt(document.getElementById("admin-coins").value);
   if (!email || isNaN(coins) || coins <= 0) {
-    alert("Vui lòng nhập email và số xu hợp lệ!");
+    alert("Vui lòng nhập email và số xu dương hợp lệ!");
     return;
   }
 
@@ -276,19 +273,19 @@ document.getElementById("admin-give-coins").addEventListener("click", async () =
     const userDoc = await getDoc(userRef);
     const currentBalance = userDoc.data().balance || 0;
     await updateDoc(userRef, { balance: currentBalance + coins });
-    alert(`Cấp ${coins} xu cho ${email} thành công!`);
+    alert(`Nạp ${coins} xu cho ${email} thành công!`);
     document.getElementById("admin-email").value = "";
     document.getElementById("admin-coins").value = "";
   } catch (error) {
-    alert(`Lỗi khi cấp xu: ${error.message}`);
+    alert(`Lỗi khi nạp xu: ${error.message}`);
   }
 });
 
 document.getElementById("admin-withdraw-coins").addEventListener("click", async () => {
-  const email = document.getElementById("admin-withdraw-email").value.trim();
-  const coins = parseInt(document.getElementById("admin-withdraw-coins").value);
+  const email = document.getElementById("admin-email").value.trim();
+  const coins = parseInt(document.getElementById("admin-coins").value);
   if (!email || isNaN(coins) || coins <= 0) {
-    alert("Vui lòng nhập email và số xu hợp lệ!");
+    alert("Vui lòng nhập email và số xu dương hợp lệ!");
     return;
   }
 
@@ -317,8 +314,8 @@ document.getElementById("admin-withdraw-coins").addEventListener("click", async 
 
     await updateDoc(userRef, { balance: currentBalance - coins });
     alert(`Rút ${coins} xu từ ${email} thành công!`);
-    document.getElementById("admin-withdraw-email").value = "";
-    document.getElementById("admin-withdraw-coins").value = "";
+    document.getElementById("admin-email").value = "";
+    document.getElementById("admin-coins").value = "";
   } catch (error) {
     alert(`Lỗi khi rút xu: ${error.message}`);
   }
@@ -457,6 +454,6 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932e12ed7d26c004',t:'MTc0NTA4MzI0MC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932e1ca1ecc2c002',t:'MTc0NTA4MzYzOC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
