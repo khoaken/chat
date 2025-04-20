@@ -36,6 +36,35 @@
       from { transform: translateX(100%); }
       to { transform: translateX(0); }
     }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 200;
+    }
+    .modal-content {
+      background: white;
+      margin: 15% auto;
+      padding: 20px;
+      width: 80%;
+      max-width: 600px;
+      border-radius: 8px;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .dark-mode .modal-content {
+      background: #2d3748;
+      color: #e2e8f0;
+    }
+    .close-btn {
+      float: right;
+      font-size: 24px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen p-6">
@@ -44,6 +73,7 @@
       <h1 class="text-3xl font-semibold text-blue-600">Giao dịch Tiền Ảo</h1>
       <div class="flex items-center gap-4">
         <button id="dark-toggle" class="text-xl bg-transparent border-none">🌙</button>
+        <button id="history-button" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Lịch sử giao dịch</button>
         <button id="back-button" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Quay lại</button>
       </div>
     </div>
@@ -60,12 +90,23 @@
         <!-- Coin items will be dynamically added here -->
       </div>
     </div>
+
+    <!-- Transaction History Modal -->
+    <div id="history-modal" class="modal">
+      <div class="modal-content">
+        <span class="close-btn" id="close-modal">&times;</span>
+        <h2 class="text-xl font-semibold mb-4">Lịch sử giao dịch</h2>
+        <div id="history-list" class="grid gap-2">
+          <!-- Transaction history will be dynamically added here -->
+        </div>
+      </div>
+    </div>
   </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { getFirestore, doc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, updateDoc, onSnapshot, arrayUnion } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
@@ -115,6 +156,7 @@ function updateMarketPrices() {
       <div class="flex items-center gap-2">
         <input id="${coin.id}-amount" type="number" min="1" class="w-24 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Số lượng">
         <button onclick="buyCoin('${coin.name}', ${price}, '${coin.id}')" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Mua</button>
+        <button onclick="sellCoin('${coin.name}', ${price}, '${coin.id}')" class="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">Bán</button>
       </div>
     `;
     marketList.appendChild(div);
@@ -152,7 +194,15 @@ async function buyCoin(coinName, price, coinId) {
 
     await updateDoc(userRef, {
       balance: currentBalance - totalCost,
-      cryptoBalances: cryptoBalances
+      cryptoBalances: cryptoBalances,
+      transactionHistory: arrayUnion({
+        type: "buy",
+        coin: coinName,
+        amount: amount,
+        price: price,
+        total: totalCost,
+        timestamp: new Date().toISOString()
+      })
     });
 
     showToast(`Mua ${amount} ${coinName} thành công với ${totalCost} xu!`);
@@ -162,10 +212,76 @@ async function buyCoin(coinName, price, coinId) {
   }
 }
 
+async function sellCoin(coinName, price, coinId) {
+  const amountInput = document.getElementById(`${coinId}-amount`);
+  const amount = parseInt(amountInput.value);
+  if (isNaN(amount) || amount <= 0) {
+    showToast("Vui lòng nhập số lượng hợp lệ!");
+    return;
+  }
+
+  const totalEarned = price * amount;
+  const user = auth.currentUser;
+  if (!user) {
+    showToast("Vui lòng đăng nhập để giao dịch!");
+    return;
+  }
+
+  try {
+    const userRef = doc(db, "users", user.uid);
+    const userDoc = await getDoc(userRef);
+    const userData = userDoc.data();
+    const cryptoBalances = userData.cryptoBalances || { "KK Coin": 0, "Haha Coin": 0, "Bich Coin": 0 };
+
+    if ((cryptoBalances[coinName] || 0) < amount) {
+      showToast(`Không đủ ${coinName}! Bạn có ${cryptoBalances[coinName] || 0} ${coinName}.`);
+      return;
+    }
+
+    cryptoBalances[coinName] -= amount;
+    const currentBalance = userData.balance || 0;
+
+    await updateDoc(userRef, {
+      balance: currentBalance + totalEarned,
+      cryptoBalances: cryptoBalances,
+      transactionHistory: arrayUnion({
+        type: "sell",
+        coin: coinName,
+        amount: amount,
+        price: price,
+        total: totalEarned,
+        timestamp: new Date().toISOString()
+      })
+    });
+
+    showToast(`Bán ${amount} ${coinName} thành công, nhận ${totalEarned} xu!`);
+    amountInput.value = "";
+  } catch (error) {
+    showToast(`Lỗi khi bán ${coinName}: ${error.message}`);
+  }
+}
+
 function loadUserInfo(userData) {
   document.getElementById("user-coins").innerText = `Xu: ${userData.balance || 0}`;
   const cryptoBalances = userData.cryptoBalances || { "KK Coin": 0, "Haha Coin": 0, "Bich Coin": 0 };
   document.getElementById("crypto-balances").innerText = `Số dư tiền ảo: KK Coin: ${cryptoBalances["KK Coin"] || 0}, Haha Coin: ${cryptoBalances["Haha Coin"] || 0}, Bich Coin: ${cryptoBalances["Bich Coin"] || 0}`;
+  
+  // Load transaction history
+  const historyList = document.getElementById("history-list");
+  historyList.innerHTML = "";
+  const transactions = userData.transactionHistory || [];
+  transactions.forEach(tx => {
+    const div = document.createElement("div");
+    div.className = "p-2 border-b border-gray-200";
+    div.innerHTML = `
+      <p><strong>${tx.type === "buy" ? "Mua" : "Bán"} ${tx.coin}</strong></p>
+      <p>Số lượng: ${tx.amount}</p>
+      <p>Giá: ${tx.price} xu</p>
+      <p>Tổng: ${tx.total} xu</p>
+      <p>Thời gian: ${new Date(tx.timestamp).toLocaleString("vi-VN")}</p>
+    `;
+    historyList.appendChild(div);
+  });
 }
 
 document.getElementById("dark-toggle").addEventListener("click", () => {
@@ -175,6 +291,21 @@ document.getElementById("dark-toggle").addEventListener("click", () => {
 
 document.getElementById("back-button").addEventListener("click", () => {
   window.location.href = "index.html";
+});
+
+// Transaction History Modal Handlers
+document.getElementById("history-button").addEventListener("click", () => {
+  document.getElementById("history-modal").style.display = "block";
+});
+
+document.getElementById("close-modal").addEventListener("click", () => {
+  document.getElementById("history-modal").style.display = "none";
+});
+
+window.addEventListener("click", (event) => {
+  if (event.target === document.getElementById("history-modal")) {
+    document.getElementById("history-modal").style.display = "none";
+  }
 });
 
 if (localStorage.getItem("theme") === "dark") document.body.classList.add("dark-mode");
@@ -202,6 +333,8 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 window.buyCoin = buyCoin;
+window.sellCoin = sellCoin;
 </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'93359f3efe4de592',t:'MTc0NTE2MjM4OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
