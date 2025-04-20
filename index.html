@@ -174,15 +174,16 @@
       <div id="friends-list"></div>
     </div>
 
-    <div class="mt-6">
-      <button onclick="window.location.href='cacuoc.html'" class="w-full bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700">Chơi Tài Xỉu</button>
+    <div class="mt-6 flex gap-4">
+      <button onclick="window.location.href='cacuoc.html'" class="flex-1 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700">Chơi Tài Xỉu</button>
+      <button onclick="window.location.href='chungkhoan.html'" class="flex-1 bg-indigo-600 text-white py-3 rounded-lg hover:bg-indigo-700">Giao dịch Tiền Ảo</button>
     </div>
   </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
 import { getAuth, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
-import { getFirestore, collection, doc, getDoc, setDoc, addDoc, deleteDoc, updateDoc, onSnapshot, getDocs, query, orderBy, where, collectionGroup } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+import { getFirestore, collection, doc, getDoc, setDoc, addDoc, deleteDoc, updateDoc, onSnapshot, getDocs, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
@@ -322,38 +323,52 @@ function loadFriendRequests(uid) {
   });
 }
 
-function loadSentFriendRequests(uid) {
+async function loadSentFriendRequests(uid) {
   const sentRequestsList = document.getElementById("sent-friend-requests-list");
-  const q = query(collectionGroup(db, "requests"), where("senderUid", "==", uid));
-  onSnapshot(q, async (snapshot) => {
+  try {
+    // Get all users to check their requests subcollections
+    const usersRef = collection(db, "users");
+    const usersSnap = await getDocs(usersRef);
+    let requests = [];
+
+    // Iterate through each user’s requests subcollection
+    for (const userDoc of usersSnap.docs) {
+      const receiverUid = userDoc.id;
+      if (receiverUid === uid) continue; // Skip the current user
+      const requestsRef = collection(db, "friend_requests", receiverUid, "requests");
+      const q = query(requestsRef, where("senderUid", "==", uid));
+      const requestSnap = await getDocs(q);
+      requestSnap.forEach(doc => {
+        requests.push({ id: doc.id, receiverUid, ...doc.data() });
+      });
+    }
+
     sentRequestsList.innerHTML = "";
-    if (snapshot.empty) {
+    if (requests.length === 0) {
       sentRequestsList.innerHTML = `<p class="text-gray-500 text-center">Không có lời mời kết bạn đã gửi.</p>`;
       return;
     }
-    for (const docSnap of snapshot.docs) {
-      const request = docSnap.data();
-      const requestId = docSnap.id;
-      const receiverUid = docSnap.ref.parent.parent.id;
-      const userSnap = await getDoc(doc(db, "users", receiverUid));
+
+    for (const request of requests) {
+      const userSnap = await getDoc(doc(db, "users", request.receiverUid));
       const userData = userSnap.data() || {};
       const div = document.createElement("div");
       div.className = "request-item bg-gray-50 p-3 rounded-lg flex justify-between items-center mb-2";
       div.innerHTML = `
         <div class="flex items-center gap-3">
           <div class="avatar-initial">${userData.name ? userData.name.charAt(0).toUpperCase() : "U"}</div>
-          <a href="profile.html?uid=${receiverUid}" class="font-semibold hover:underline">${userData.name || "Người dùng"}${userData.isVerified ? '<span class="verified-badge">✔</span>' : ""}</a>
+          <a href="profile.html?uid=${request.receiverUid}" class="font-semibold hover:underline">${userData.name || "Người dùng"}${userData.isVerified ? '<span class="verified-badge">✔</span>' : ""}</a>
         </div>
         <div class="flex gap-2">
-          <button onclick="window.location.href='profile.html?uid=${receiverUid}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
-          <button onclick="window.cancelSentFriendRequest('${requestId}', '${receiverUid}')" class="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700">Hủy</button>
+          <button onclick="window.location.href='profile.html?uid=${request.receiverUid}'" class="bg-gray-600 text-white px-3 py-1 rounded-lg hover:bg-gray-700">Xem hồ sơ</button>
+          <button onclick="window.cancelSentFriendRequest('${request.id}', '${request.receiverUid}')" class="bg-red-600 text-white px-3 py-1 rounded-lg hover:bg-red-700">Hủy</button>
         </div>
       `;
       sentRequestsList.appendChild(div);
     }
-  }, (error) => {
+  } catch (error) {
     showToast(`Lỗi khi tải lời mời đã gửi: ${error.message}`);
-  });
+  }
 }
 
 // Define functions in global scope
@@ -670,44 +685,5 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 </script>
-<script>
-(function() {
-  function c() {
-    var b = a.contentDocument || a.contentWindow.document;
-    if (b) {
-      var d = b.createElement('script');
-      d.innerHTML = "window.__CF$cv$params={r:'932e645a3d67b06f',t:'MTc0NTA4NjU3NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";
-      b.getElementsByTagName('head')[0].appendChild(d);
-    }
-  }
-  if (document.body) {
-    var a = document.createElement('iframe');
-    a.height = 1;
-    a.width = 1;
-    a.style.position = 'absolute';
-    a.style.top = 0;
-    a.style.left = 0;
-    a.style.border = 'none';
-    a.style.visibility = 'hidden';
-    document.body.appendChild(a);
-    if ('loading' !== document.readyState) {
-      c();
-    } else if (window.addEventListener) {
-      document.addEventListener('DOMContentLoaded', c);
-    } else {
-      var e = document.onreadystatechange || function() {};
-      document.onreadystatechange = function(b) {
-        e(b);
-        if ('loading' !== document.readyState) {
-          document.onreadystatechange = e;
-          c();
-        }
-      };
-    }
-  }
-})();
-</script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932ec0254c3abfa2',t:'MTc0NTA5MDMzNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'932edbc00b21bfe3',t:'MTc0NTA5MTQ2Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
