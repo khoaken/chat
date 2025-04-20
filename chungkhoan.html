@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Giao dịch Tiền Ảo - KKChat</title>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="ChatUp" />
+  <meta name="theme-color" content="#4a90e2" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Montserrat', sans-serif; }
+    .dark-mode { background: #1a202c; color: #e2e8f0; }
+    .dark-mode .bg-white { background: #2d3748; }
+    .dark-mode .bg-gray-100 { background: #1a202c; }
+    .dark-mode .border-gray-200 { border-color: #4a5568; }
+    .dark-mode input, .dark-mode button { background: #4a5568; color: #e2e8f0; border-color: #718096; }
+    .coin-item { transition: all 0.2s ease; }
+    .coin-item:hover { transform: translateY(-2px); }
+    .toast {
+      position: fixed;
+      bottom: calc(20px + env(safe-area-inset-bottom));
+      right: calc(20px + env(safe-area-inset-right));
+      background: #4a90e2;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 5px;
+      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+      z-index: 100;
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-6">
+  <div class="max-w-4xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-3xl font-semibold text-blue-600">Giao dịch Tiền Ảo</h1>
+      <div class="flex items-center gap-4">
+        <button id="dark-toggle" class="text-xl bg-transparent border-none">🌙</button>
+        <button id="back-button" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Quay lại</button>
+      </div>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md mb-6">
+      <h2 class="text-xl font-semibold mb-4">Thông tin tài khoản</h2>
+      <p id="user-coins" class="text-gray-600 mb-4">Xu: 0</p>
+      <p id="crypto-balances" class="text-gray-600">Số dư tiền ảo: KK Coin: 0, Haha Coin: 0, Bich Coin: 0</p>
+    </div>
+
+    <div class="bg-white p-6 rounded-lg shadow-md">
+      <h2 class="text-xl font-semibold mb-4">Thị trường tiền ảo</h2>
+      <div id="market-list" class="grid gap-4">
+        <!-- Coin items will be dynamically added here -->
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-auth.js";
+import { getFirestore, doc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAry2Wta_2_mWxfplmfnpHn3aBSpH-ZDqU",
+  authDomain: "chatup-7fed7.firebaseapp.com",
+  projectId: "chatup-7fed7",
+  storageBucket: "chatup-7fed7.appspot.com",
+  messagingSenderId: "287838782402",
+  appId: "1:287838782402:web:c4fd4b4ce02c3238530c5b"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+function showToast(message) {
+  const toast = document.createElement("div");
+  toast.className = "toast";
+  toast.innerText = message;
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+function generateCoinPrice(basePrice) {
+  const fluctuation = (Math.random() - 0.5) * 0.2; // ±20% fluctuation
+  return Math.max(10, (basePrice * (1 + fluctuation)).toFixed(2));
+}
+
+function updateMarketPrices() {
+  const coins = [
+    { name: "KK Coin", basePrice: 100, id: "kk-coin" },
+    { name: "Haha Coin", basePrice: 50, id: "haha-coin" },
+    { name: "Bich Coin", basePrice: 75, id: "bich-coin" }
+  ];
+
+  const marketList = document.getElementById("market-list");
+  marketList.innerHTML = "";
+
+  coins.forEach(coin => {
+    const price = generateCoinPrice(coin.basePrice);
+    const div = document.createElement("div");
+    div.className = "coin-item bg-gray-50 p-4 rounded-lg flex justify-between items-center";
+    div.innerHTML = `
+      <div>
+        <h3 class="font-semibold">${coin.name}</h3>
+        <p class="text-gray-600">Giá: ${price} xu</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <input id="${coin.id}-amount" type="number" min="1" class="w-24 p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600" placeholder="Số lượng">
+        <button onclick="buyCoin('${coin.name}', ${price}, '${coin.id}')" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">Mua</button>
+      </div>
+    `;
+    marketList.appendChild(div);
+  });
+}
+
+async function buyCoin(coinName, price, coinId) {
+  const amountInput = document.getElementById(`${coinId}-amount`);
+  const amount = parseInt(amountInput.value);
+  if (isNaN(amount) || amount <= 0) {
+    showToast("Vui lòng nhập số lượng hợp lệ!");
+    return;
+  }
+
+  const totalCost = price * amount;
+  const user = auth.currentUser;
+  if (!user) {
+    showToast("Vui lòng đăng nhập để giao dịch!");
+    return;
+  }
+
+  try {
+    const userRef = doc(db, "users", user.uid);
+    const userDoc = await getDoc(userRef);
+    const userData = userDoc.data();
+    const currentBalance = userData.balance || 0;
+
+    if (currentBalance < totalCost) {
+      showToast(`Số xu không đủ! Cần ${totalCost} xu, bạn có ${currentBalance} xu.`);
+      return;
+    }
+
+    const cryptoBalances = userData.cryptoBalances || { "KK Coin": 0, "Haha Coin": 0, "Bich Coin": 0 };
+    cryptoBalances[coinName] = (cryptoBalances[coinName] || 0) + amount;
+
+    await updateDoc(userRef, {
+      balance: currentBalance - totalCost,
+      cryptoBalances: cryptoBalances
+    });
+
+    showToast(`Mua ${amount} ${coinName} thành công với ${totalCost} xu!`);
+    amountInput.value = "";
+  } catch (error) {
+    showToast(`Lỗi khi mua ${coinName}: ${error.message}`);
+  }
+}
+
+function loadUserInfo(userData) {
+  document.getElementById("user-coins").innerText = `Xu: ${userData.balance || 0}`;
+  const cryptoBalances = userData.cryptoBalances || { "KK Coin": 0, "Haha Coin": 0, "Bich Coin": 0 };
+  document.getElementById("crypto-balances").innerText = `Số dư tiền ảo: KK Coin: ${cryptoBalances["KK Coin"] || 0}, Haha Coin: ${cryptoBalances["Haha Coin"] || 0}, Bich Coin: ${cryptoBalances["Bich Coin"] || 0}`;
+}
+
+document.getElementById("dark-toggle").addEventListener("click", () => {
+  document.body.classList.toggle("dark-mode");
+  localStorage.setItem("theme", document.body.classList.contains("dark-mode") ? "dark" : "light");
+});
+
+document.getElementById("back-button").addEventListener("click", () => {
+  window.location.href = "index.html";
+});
+
+if (localStorage.getItem("theme") === "dark") document.body.classList.add("dark-mode");
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    window.location.href = "login.html";
+    return;
+  }
+
+  try {
+    const userRef = doc(db, "users", user.uid);
+    onSnapshot(userRef, (doc) => {
+      if (doc.exists()) {
+        loadUserInfo(doc.data());
+      }
+    });
+
+    updateMarketPrices();
+    setInterval(updateMarketPrices, 10000); // Update prices every 10 seconds
+  } catch (error) {
+    showToast(`Lỗi khi tải thông tin: ${error.message}`);
+    window.location.href = "login.html";
+  }
+});
+
+window.buyCoin = buyCoin;
+</script>
+</body>
+</html>
